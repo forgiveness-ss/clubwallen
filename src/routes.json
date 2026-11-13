@@ -1,0 +1,56 @@
+{
+  "/checkout/cashapp": {
+    "module": 21309
+  },
+  "/checkout": {
+    "module": 37142
+  },
+  "/confirmation": {
+    "module": 99483
+  },
+  "/dashboard": {
+    "module": 78928
+  },
+  "/donate": {
+    "module": 45385
+  },
+  "/faq": {
+    "module": 30229
+  },
+  "/": {
+    "module": 31713
+  },
+  "/join": {
+    "module": 7103
+  },
+  "/login": {
+    "module": 89954
+  },
+  "/privacy": {
+    "html": "static-pages/_privacy.html"
+  },
+  "/sand-in-my-boots/checkout": {
+    "module": 14270
+  },
+  "/sand-in-my-boots/hotels": {
+    "module": 12293
+  },
+  "/sand-in-my-boots": {
+    "module": 19330
+  },
+  "/shop": {
+    "module": 32115
+  },
+  "/signup": {
+    "module": 82306
+  },
+  "/support": {
+    "module": 64829
+  },
+  "/terms": {
+    "html": "static-pages/_terms.html"
+  },
+  "/tickets": {
+    "module": 93546
+  }
+}

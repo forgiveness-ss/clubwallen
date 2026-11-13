@@ -1,0 +1,13 @@
+/* Preserve the reference's visual design; these rules cover demo-only surfaces. */
+button:focus-visible,a:focus-visible{outline:2px solid #c8a84b;outline-offset:5px}
+.demo-notice{position:relative;z-index:10;margin:76px 24px -58px;padding:10px 16px;border:1px solid #42381e;background:#16130d;color:#b6a778;font:12px/1.6 Georgia,serif;text-align:center;border-radius:3px}
+.utility-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:120px 24px 80px;background:#0a0a0a}
+.utility-card{width:100%;max-width:560px;padding:40px;border:1px solid #2a2416;background:#111;text-align:center;border-radius:3px}.utility-card.wide{max-width:900px}
+.utility-card h1{font-size:38px;color:#c8a84b;margin:18px 0 24px}.utility-card h2{font-size:22px;color:#c8a84b;margin:32px 0 18px}.utility-card p{line-height:1.9;color:#b1a58b;margin:12px 0}
+.eyebrow{font-size:10px;letter-spacing:5px;text-transform:uppercase;color:#8e7949}.muted{color:#81735a!important}.payment-total{font-size:48px;color:#c8a84b!important}
+.gold-button{display:inline-block;background:#c8a84b;color:#0a0a0a;border:0;border-radius:2px;padding:15px 24px;font:700 11px Georgia,serif;letter-spacing:2px;text-transform:uppercase;cursor:pointer;margin:12px 0}
+.text-link{display:block;margin:16px auto;color:#c8a84b;background:none;border:0;font:14px Georgia,serif;cursor:pointer}.demo-panel{padding:20px;margin:24px 0;border:1px solid #42381e;color:#b9ac87;font-size:14px;line-height:1.8}
+.portal-links{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:32px 0}.portal-links a{border:1px solid #42381e;padding:18px;color:#c8a84b}.order-row{display:flex;gap:20px;justify-content:space-between;padding:16px;border-bottom:1px solid #2a2416;font-size:13px}
+.cookie-overlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px;background:#000b}.cookie-dialog{max-width:480px;padding:36px;background:#141414;border:1px solid #7a6630;border-radius:3px}.cookie-dialog h2{color:#c8a84b;margin-bottom:20px}.cookie-dialog p{color:#baa986;line-height:1.8;font-size:14px}
+@media(max-width:600px){.utility-card{padding:28px 20px}.utility-card h1{font-size:30px}.demo-notice{margin:76px 12px -50px;font-size:10px}.order-row{flex-direction:column;gap:6px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.animate-in,.animate-left,.animate-right{opacity:1!important;transform:none!important}}
