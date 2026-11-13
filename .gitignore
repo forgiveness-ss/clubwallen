@@ -9,3 +9,4 @@ reference/
 .DS_Store
 .data/
 coverage/
+.vercel/

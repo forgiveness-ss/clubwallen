@@ -1,10 +1,12 @@
 # Club Wallen — The Exclusive
 
-The storefront now includes a local Node.js backend, persistent SQLite database, customer accounts, a protected CRM, and payment integration code. It runs on localhost without ChatGPT authentication. No live payment credentials are configured by default.
+The storefront includes a Node.js backend, customer accounts, a protected CRM, and payment integration code. Vercel hosts the frontend and API; Supabase supplies PostgreSQL and private receipt storage. Local development also works with SQLite without ChatGPT authentication. Cloud accounts and payment credentials must be configured before deployment is operational.
+
+See [Cloud setup](docs/CLOUD-SETUP.md) for the account connection, database setup, Vercel import, environment variables, and administrator activation.
 
 ## Run locally
 
-Requires Node.js 24 or later; verified with Node.js 26.5.
+Vercel uses Node.js 24. Local checks were also run on Node.js 26.5.
 
 ```sh
 npm ci
@@ -45,12 +47,12 @@ See [docs/BACKEND.md](docs/BACKEND.md) for the API and verification rules.
 
 ## Scope and remaining integrations
 
-Merchandise and membership checkout use the new backend. Customers, orders, payment status, membership activation, product prices, stock counts, support replies, and audit history are backed by SQLite. Newly registered customer accounts require administrator verification of email ownership before historical customer records are released.
+Merchandise and membership checkout use the new backend. Customers, orders, payment status, membership activation, product prices, stock counts, support replies, and audit history use the configured database (Supabase PostgreSQL in production; SQLite locally). Newly registered customer accounts require administrator verification of email ownership before historical customer records are released.
 
 Original event, festival, hotel, foundation, and legacy payment screens remain labeled reference previews. Real ticket/hotel inventory, donation processing, a content editor, outbound email, automated email verification/password recovery, shipping services, and tax configuration are not implemented.
 
 The shop and membership-selection pages read prices from the backend. Homepage promotional plan descriptions/prices remain marketing copy in `src/components/Home.js`; update those when changing offers. Do not rerun `scripts/extract-components.mjs` over customized components; that research utility imports the original captured application.
 
-`dist/` contains only the frontend. Hosting that directory alone does not run the backend or CRM API. This work remains local as requested; the earlier private hosted preview has not been updated with the backend.
+`dist/` contains the frontend. `api/index.js` supplies the Vercel Function; `vercel.json` routes API requests to it. Deploy the complete Git repository to Vercel, rather than uploading `dist/` alone. Database tables and storage are provisioned separately with `npm run setup:cloud`; they are not created by a Git push. The earlier private Sites preview has not been updated.
 
 [Original reference audit](docs/ARCHITECTURE.md)
