@@ -1,4 +1,26 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { readFile } from "node:fs/promises";
+import { rootCertificates } from "node:tls";
+
+export async function databaseTls(hostname, env = process.env) {
+  let ca = env.DATABASE_SSL_CA?.replace(/\\n/g, "\n");
+  if (!ca && env.DATABASE_SSL_CA_FILE)
+    ca = await readFile(env.DATABASE_SSL_CA_FILE, "utf8");
+  if (
+    !ca &&
+    (hostname.endsWith(".pooler.supabase.com") ||
+      /^db\.[a-z0-9]+\.supabase\.co$/.test(hostname))
+  ) {
+    ca = await readFile(
+      new URL("./certs/supabase-ca.crt", import.meta.url),
+      "utf8",
+    );
+  }
+  return {
+    rejectUnauthorized: true,
+    ...(ca ? { ca: [...rootCertificates, ca] } : {}),
+  };
+}
 
 // Keep application SQL portable; PostgreSQL tables live outside the public API schema.
 export function postgresSql(sql) {
@@ -118,7 +140,7 @@ export async function connectPostgres(connectionString) {
   const pool = new Pool({
     connectionString: url.toString(),
     max: 1,
-    ssl: { rejectUnauthorized: true },
+    ssl: await databaseTls(url.hostname),
     connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 10000,
     allowExitOnIdle: true,

@@ -1,6 +1,6 @@
 # Vercel + Supabase setup
 
-The source supports this stack. Creating provider accounts alone does not provision or connect a project. No cloud project or live payment account has been verified yet.
+The source supports this stack. Creating provider accounts alone does not provision or connect a project. The setup command provisions and verifies Supabase; Vercel deployment and live payment configuration require separate verification.
 
 ## Connect the accounts in this conversation
 
@@ -23,6 +23,8 @@ npm run setup:cloud
 This applies `supabase/migrations/001_crm.sql` inside a transaction, seeds missing products/settings without overwriting CRM changes, and creates or secures the `payment-receipts` bucket as private. Allowed images are PNG/JPEG/WebP up to 3 MB. The migration uses a private schema and does not expose customer tables through Supabase's public Data API. Run setup separately from the Vercel build; builds never migrate a production database automatically.
 
 If a migration connection is needed, set `DATABASE_MIGRATION_URL` to the project's session pooler connection. A migration may use this override while runtime requests use the transaction pooler. TLS certificate verification remains enabled.
+
+Supabase's public database CA certificates are bundled for both local setup and Vercel. If you use a different database CA, set `DATABASE_SSL_CA` to its PEM text (multiline or escaped `\n`) or `DATABASE_SSL_CA_FILE` to a local certificate file. On Vercel use the PEM environment variable rather than a path on your Mac. Setup reports the failing stage and a safe explanation without printing provider messages or credentials.
 
 The existing local database currently has no accounts, customers, orders, memberships, or messages. Local records created later do not copy themselves into Supabase; move those records and receipts explicitly before switching a populated installation. Never commit a database dump.
 

@@ -4,7 +4,7 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": { "api/index.js": { "maxDuration": 30 } },
+  "functions": { "api/index.js": { "maxDuration": 30, "includeFiles": "server/certs/**" } },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index?__route=/api/:path*" },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }

@@ -2,12 +2,56 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
 import { createHmac } from "node:crypto";
-import { postgresAdapter, postgresSql } from "../server/sql.mjs";
+import { postgresAdapter, postgresSql, databaseTls } from "../server/sql.mjs";
+import { X509Certificate } from "node:crypto";
+import { setupError } from "../server/setup-errors.mjs";
 import { migrate } from "../server/migrate.mjs";
 import { createApi } from "../server/api.mjs";
 import { serveRequest } from "../server/web-handler.mjs";
 import { settleOrder } from "../server/database.mjs";
 import deployment from "../api/index.js";
+
+test("Supabase database CAs are valid and remain scoped to provider hosts with verification enabled", async () => {
+  const tls = await databaseTls("aws-0-us-east-1.pooler.supabase.com", {});
+  assert.equal(tls.rejectUnauthorized, true);
+  const bundled = tls.ca
+    .at(-1)
+    .match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
+  assert.equal(bundled.length, 2);
+  for (const pem of bundled) {
+    const cert = new X509Certificate(pem);
+    assert.equal(cert.ca, true);
+    assert.ok(cert.verify(cert.publicKey));
+    assert.ok(Date.parse(cert.validTo) > Date.now());
+  }
+  assert.deepEqual(
+    await databaseTls("pooler.supabase.com.attacker.invalid", {}),
+    { rejectUnauthorized: true },
+  );
+  assert.deepEqual(await databaseTls("db.example.com", {}), {
+    rejectUnauthorized: true,
+  });
+});
+
+test("Cloud setup diagnoses certificate, credential and provider failures without disclosing raw errors", () => {
+  const credential = "never-print-this-fixture-secret";
+  const url = "postgresql://owner:" + credential + "@private.example/db";
+  const cases = [
+    [{ code: "SELF_SIGNED_CERT_IN_CHAIN", message: url }, /TLS certificate/],
+    [{ code: "28P01", message: url }, /database credentials/],
+    [{ code: "ENOTFOUND", message: url }, /hostname/],
+    [{ statusCode: "401", message: url }, /Storage key/],
+    [{ cause: { code: "ECONNREFUSED", message: url } }, /could not be reached/],
+    [{ code: "42601", message: url }, /migration SQL/],
+    [{ message: url }, /raw errors are hidden/],
+  ];
+  for (const [error, expected] of cases) {
+    const output = setupError(error, "database connection");
+    assert.match(output, expected);
+    assert.ok(!output.includes(credential));
+    assert.ok(!output.includes("private.example"));
+  }
+});
 
 const origin = "https://club.example";
 const password = "CloudFixturePassword!2026";
