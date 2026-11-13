@@ -54,6 +54,8 @@ The database/storage variables are required for the API. Payment keys can be omi
 
 Open `https://YOUR-DOMAIN/admin`. Enter your name, configured owner email, a password of at least 12 characters, and the setup token stored in Vercel. Setup is locked after the first administrator is created. Remove `ADMIN_SETUP_TOKEN` from Vercel and redeploy after activation. Later visits use the administrator email/password. Public customer signup never creates an administrator.
 
+If `/admin` cannot check setup, it shows a connection error and a retry button. Open `/api/status` for a safe configuration error. In particular, `APP_BASE_URL` in Vercel must be your actual HTTPS production origin, rather than the localhost value in `.env.example`. Fix the named Production environment variables and redeploy; adding `ADMIN_EMAIL` alone does not create an account.
+
 In CRM → Payment settings, enter your Cash App handle. Cards and supported stablecoins are automatically marked paid only after verified Stripe webhooks. Cash App receipts require an administrator to verify the transfer and record its reference before approval. Memberships renew manually each year.
 
 ## Connect Stripe and verify

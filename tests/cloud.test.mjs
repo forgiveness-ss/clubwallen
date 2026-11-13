@@ -10,6 +10,83 @@ import { createApi } from "../server/api.mjs";
 import { serveRequest } from "../server/web-handler.mjs";
 import { settleOrder } from "../server/database.mjs";
 import deployment from "../api/index.js";
+import { cloudConfiguration } from "../server/cloud-config.mjs";
+import { readAdminAccess } from "../src/admin-access.js";
+
+test("Admin page waits for verified setup state and propagates backend failures instead of choosing sign-in", async () => {
+  const failure = Error("Missing Vercel environment variables: APP_BASE_URL.");
+  await assert.rejects(
+    () =>
+      readAdminAccess(async (route) => {
+        if (route === "/api/status") throw failure;
+        return { user: null };
+      }),
+    (error) => error === failure,
+  );
+  await assert.rejects(
+    () => readAdminAccess(async () => ({})),
+    /could not confirm/,
+  );
+  assert.deepEqual(
+    await readAdminAccess(async (route) =>
+      route === "/api/status"
+        ? { adminReady: false, setupTokenRequired: true }
+        : { user: null },
+    ),
+    { setup: true, setupTokenRequired: true, user: null },
+  );
+  assert.equal(
+    (
+      await readAdminAccess(async (route) =>
+        route === "/api/status"
+          ? { adminReady: true, setupTokenRequired: true }
+          : { user: null },
+      )
+    ).setup,
+    false,
+  );
+});
+
+test("Cloud configuration identifies missing and invalid environment settings without exposing their values", () => {
+  const env = {
+    APP_BASE_URL: "https://club.example",
+    DATABASE_URL: "postgresql://user:fixture-secret@db.example/postgres",
+    SUPABASE_URL: "https://project.supabase.co",
+    SUPABASE_SECRET_KEY: "sb_secret_fixture",
+  };
+  assert.equal(cloudConfiguration(env).baseUrl, "https://club.example");
+  assert.throws(
+    () => cloudConfiguration({ ...env, APP_BASE_URL: "" }),
+    (error) =>
+      /APP_BASE_URL/.test(error.safeMessage) &&
+      !error.safeMessage.includes("fixture-secret"),
+  );
+  assert.throws(
+    () => cloudConfiguration({ ...env, APP_BASE_URL: "http://localhost:4173" }),
+    (error) => /HTTPS website origin/.test(error.safeMessage),
+  );
+  assert.throws(
+    () =>
+      cloudConfiguration({ ...env, DATABASE_URL: "invalid-fixture-secret" }),
+    (error) =>
+      /DATABASE_URL/.test(error.safeMessage) &&
+      !error.safeMessage.includes("invalid-fixture-secret"),
+  );
+  assert.throws(
+    () =>
+      cloudConfiguration({
+        ...env,
+        SUPABASE_SECRET_KEY: "sb_publishable_fixture",
+      }),
+    (error) => /server secret key/.test(error.safeMessage),
+  );
+  assert.equal(
+    cloudConfiguration({ ...env, ADMIN_EMAIL: "", ADMIN_SETUP_TOKEN: "" })
+      .supabaseUrl,
+    env.SUPABASE_URL,
+    "bootstrap credentials are optional after the first administrator exists",
+  );
+});
 
 test("Supabase database CAs are valid and remain scoped to provider hosts with verification enabled", async () => {
   const tls = await databaseTls("aws-0-us-east-1.pooler.supabase.com", {});
