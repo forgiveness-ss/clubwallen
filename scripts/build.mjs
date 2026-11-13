@@ -14,7 +14,8 @@ const routes=JSON.parse(await readFile(path.join(root,'src/routes.json'),'utf8')
 const staticPages={};for(const [route,config] of Object.entries(routes))if(config.html)staticPages[route]=await readFile(path.join(root,'src',config.html),'utf8');
 await build({entryPoints:[path.join(root,'src/app.jsx')],outfile:path.join(out,'assets/app.js'),bundle:true,format:'esm',minify:true,define:{'process.env.NODE_ENV':'"production"','globalThis.__RESERVE_STATIC_PAGES__':JSON.stringify(staticPages)},loader:{'.js':'jsx'},logLevel:'warning'});
 const template=await readFile(path.join(root,'src/snapshots/index.html'),'utf8');
-const capturedBody=template.match(/<header[\s\S]*?(?=<script)/)?.[0]||'';
+const captureBody=html=>(html.match(/<header[\s\S]*?(?=<script)/)?.[0]||'').replace(/<header\b[\s\S]*?<\/header>/,header=>header.replaceAll('THE RESERVE','THE EXCLUSIVE'));
+const capturedBody=captureBody(template);
 const shell=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Club Wallen: The Reserve</title><meta name="description" content="Private Club Wallen reference rebuild for rebranding."><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/assets/site.css"><script type="module" src="/assets/app.js"></script></head><body><div id="root">${capturedBody}</div><noscript>This website needs JavaScript for carts, membership selection, and checkout.</noscript></body></html>`;
 const outputRoutes=[...new Set([...Object.keys(routes),'/dashboard','/portal','/checkout/crypto'])];
 for(const route of outputRoutes){
@@ -22,7 +23,7 @@ for(const route of outputRoutes){
  await mkdir(path.dirname(destination),{recursive:true});
  let html=shell;
  if(route!=='/'){
-  try{const reference=await readFile(path.join(root,'src/snapshots',route.slice(1)+'.html'),'utf8');const body=reference.match(/<header[\s\S]*?(?=<script)/)?.[0]||'';html=shell.replace(capturedBody,body);}catch{html=shell.replace(capturedBody,'');}
+  try{const reference=await readFile(path.join(root,'src/snapshots',route.slice(1)+'.html'),'utf8');const body=captureBody(reference);html=shell.replace(capturedBody,body);}catch{html=shell.replace(capturedBody,'');}
  }
  await writeFile(destination,html);
 }

@@ -68,6 +68,7 @@ for(const id of wanted){
  if(emitted.has(m.primary))continue;emitted.add(m.primary);
  let body=m.source;
  let prefix='';
+ if(m.primary===70119)body=body.replaceAll('children:"THE RESERVE"','children:"THE EXCLUSIVE"');
  if(m.primary===21309){prefix="import {siteConfig} from '../site.config.js';\n";body=body.replace('let r="$30mog",o="support@clubwallen.site"','let r=siteConfig.cashTag,o=siteConfig.supportEmail');}
  if(m.primary===37142)body=body.replace('form:d,','form:{firstName:d.firstName,lastName:d.lastName,email:d.email,address:d.address,city:d.city,state:d.state,zip:d.zip,country:d.country},');
  if(m.primary===82306)body=body.replace('console.log("SIGNUP RESULT:",{data:i,signUpError:o}),o','o').replace('DEBUG SUCCESS: user created with id ${i.user.id}. Redirecting...','Demo account created. Opening the demo sign-in page...').replace('SUPABASE ERROR:','Account error:');

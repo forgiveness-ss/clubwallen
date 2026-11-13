@@ -135,7 +135,7 @@ export default (e) => {
                       fontFamily: "Georgia,serif",
                       fontWeight: "bold",
                     },
-                    children: "THE RESERVE",
+                    children: "THE EXCLUSIVE",
                   }),
                 ],
               }),
@@ -285,7 +285,7 @@ export default (e) => {
                       letterSpacing: 6,
                       fontFamily: "Georgia,serif",
                     },
-                    children: "THE RESERVE",
+                    children: "THE EXCLUSIVE",
                   }),
                   (0, t.jsx)("div", {
                     style: {
