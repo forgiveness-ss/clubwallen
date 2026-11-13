@@ -18,7 +18,20 @@ import {
   audit,
   transaction,
 } from "./database.mjs";
-import { verifyStripe, stripeCheckout } from "./payments.mjs";
+import {
+  verifyStripe,
+  stripeCheckout,
+  applePayIntent,
+  stripeIntent,
+} from "./payments.mjs";
+import {
+  PAYMENT_DEFAULTS,
+  paymentReadiness,
+  validatePaymentSettings,
+  receivingDetails,
+  isManual,
+} from "./payment-settings.mjs";
+import { marketQuote, validCryptoAmount } from "./crypto-quotes.mjs";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const passwordHash = (password) => {
   const salt = randomBytes(16).toString("hex");
@@ -78,6 +91,7 @@ export async function createApi({
   baseUrl = "http://localhost:4173",
   stripeKey = "",
   stripeWebhook = "",
+  stripePublishable = "",
   fetcher = fetch,
 } = {}) {
   if (cloud && !databaseUrl && !database)
@@ -150,15 +164,7 @@ export async function createApi({
       country: "US",
       currency: "USD",
       renewal: "manual",
-      cardConfigured: !!stripeKey && !!stripeWebhook,
-      cardMode:
-        stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_")
-          ? "live"
-          : "test",
-      cryptoConfigured:
-        !!stripeKey && !!stripeWebhook && s.cryptoEnabled === "true",
-      cashAppConfigured: /^\$[A-Za-z0-9]{1,20}$/.test(s.cashTag),
-      cashTag: s.cashTag,
+      ...paymentReadiness(s, { stripeKey, stripeWebhook, stripePublishable }),
       supportEmail: s.supportEmail,
       emailConfigured: false,
     };
@@ -191,6 +197,38 @@ export async function createApi({
       )
         return reply(res, { received: true, duplicate: true });
       const data = event.data?.object;
+      if (event.type === "payment_intent.succeeded") {
+        const order = await db
+          .prepare(
+            "SELECT * FROM orders WHERE provider_id=? AND method='applepay'",
+          )
+          .get(data?.id || "");
+        if (
+          !order ||
+          data.status !== "succeeded" ||
+          data.metadata?.order_id !== order.id ||
+          data.amount_received !== order.amount_cents ||
+          data.currency !== "usd" ||
+          !!event.livemode !== (order.provider_mode === "live")
+        )
+          fail(400, "Apple Pay payment does not match the stored order");
+        const intent = await stripeIntent(order.provider_id, env, fetcher);
+        if (
+          intent.status !== "succeeded" ||
+          intent.amount_received !== order.amount_cents ||
+          intent.currency !== "usd" ||
+          intent.metadata?.order_id !== order.id ||
+          !!intent.livemode !== (order.provider_mode === "live") ||
+          intent.latest_charge?.payment_method_details?.card?.wallet?.type !==
+            "apple_pay"
+        )
+          fail(
+            400,
+            "Stripe did not verify an Apple Pay payment for this order",
+          );
+        await settleOrder(db, order.id, "stripe-webhook", intent.id);
+      }
+
       if (
         [
           "checkout.session.completed",
@@ -499,22 +537,18 @@ export async function createApi({
       if (route === "/api/orders" && method === "POST") {
         await limited(req, "checkout", 100);
         const cfg = await config();
-        if (!["card", "crypto", "cashapp"].includes(input.method))
-          fail(400, "Choose a payment method");
-        if (input.method === "card" && !cfg.cardConfigured)
+        if (!cfg.methods.includes(input.method))
+          fail(400, "Choose Apple Pay, Bitcoin, USDT, or wire transfer");
+        const ready = {
+          applepay: cfg.applePayConfigured,
+          btc: cfg.btcConfigured,
+          usdt: cfg.usdtConfigured,
+          wire: cfg.wireConfigured,
+        };
+        if (!ready[input.method])
           fail(
             503,
-            "Card payments need your Stripe secret key and webhook secret.",
-          );
-        if (input.method === "crypto" && !cfg.cryptoConfigured)
-          fail(
-            503,
-            "Enable stablecoin payments in Stripe, then enable crypto in CRM payment settings.",
-          );
-        if (input.method === "cashapp" && !cfg.cashAppConfigured)
-          fail(
-            503,
-            "Set your own Cash App handle in the CRM payment settings first.",
+            "This payment method has not been configured by the business yet.",
           );
         if (!email(input.email) || !text(input.name))
           fail(400, "Enter your name and a valid email");
@@ -570,8 +604,7 @@ export async function createApi({
             items.some((i) => i.kind === "merch") && subtotal <= 10000
               ? 999
               : 0;
-        if (input.method === "crypto" && subtotal + shipping > 1000000)
-          fail(400, "Stablecoin checkout is limited to $10,000 per order");
+
         const address = Object.fromEntries(
           ["line1", "city", "state", "zip", "country"].map((key) => [
             key,
@@ -592,9 +625,23 @@ export async function createApi({
             input.email.toLowerCase().trim(),
             text(input.name),
           );
+        const details =
+          input.method === "applepay"
+            ? {}
+            : receivingDetails(input.method, await settings(db));
+        if (["btc", "usdt"].includes(input.method)) {
+          try {
+            Object.assign(
+              details,
+              await marketQuote(input.method, subtotal + shipping, fetcher),
+            );
+          } catch {
+            details.quoteRequested = true;
+          }
+        }
         await db
           .prepare(
-            "INSERT INTO orders(id,customer_id,method,amount_cents,items,address,access_token_hash,provider_mode,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO orders(id,customer_id,method,amount_cents,items,address,access_token_hash,provider_mode,created_at,payment_details) VALUES(?,?,?,?,?,?,?,?,?,?)",
           )
           .run(
             oid,
@@ -604,8 +651,9 @@ export async function createApi({
             JSON.stringify(items),
             JSON.stringify(address),
             hash(token),
-            input.method === "cashapp" ? "live" : cfg.cardMode,
+            input.method === "applepay" ? cfg.applePayMode : "live",
             now(),
+            JSON.stringify(details),
           );
         const order = {
           id: oid,
@@ -615,21 +663,22 @@ export async function createApi({
           amount_cents: subtotal + shipping,
           method: input.method,
         };
-        if (input.method === "cashapp")
-          return reply(
-            res,
-            {
-              orderId: oid,
-              url: `/checkout/result?order=${oid}&token=${token}`,
-            },
-            201,
-          );
+        const resultUrl = `/checkout/result?order=${oid}&token=${token}`;
+        if (input.method !== "applepay") {
+          if (details.quoteRequested)
+            await db
+              .prepare("UPDATE orders SET status='quote_requested' WHERE id=?")
+              .run(oid);
+          return reply(res, { orderId: oid, url: resultUrl }, 201);
+        }
         try {
-          const payment = await stripeCheckout(order, token, env, fetcher);
+          const payment = await applePayIntent(order, env, fetcher);
+          if (!payment.id.startsWith("pi_") || !payment.client_secret)
+            throw Error("Stripe did not return an Apple Pay payment.");
           await db
             .prepare("UPDATE orders SET provider_id=? WHERE id=?")
             .run(payment.id, oid);
-          return reply(res, { orderId: oid, url: payment.url }, 201);
+          return reply(res, { orderId: oid, url: resultUrl }, 201);
         } catch (error) {
           await db
             .prepare(
@@ -652,41 +701,116 @@ export async function createApi({
           reference: order.reference,
           receiptUploaded: !!order.receipt,
           created_at: order.created_at,
+          payment_details: JSON.parse(order.payment_details || "{}"),
         };
         return reply(res, {
           order: publicOrder,
-          cashTag: (await settings(db)).cashTag,
         });
+      }
+      if (route === "/api/order/applepay" && method === "GET") {
+        const order = await orderAccess(req, url);
+        if (
+          order.method !== "applepay" ||
+          !order.provider_id ||
+          order.payment_status === "paid"
+        )
+          fail(409, "This order does not need Apple Pay");
+        const intent = await stripeIntent(order.provider_id, env, fetcher);
+        if (
+          intent.metadata?.order_id !== order.id ||
+          intent.amount !== order.amount_cents ||
+          intent.currency !== "usd"
+        )
+          fail(409, "The payment does not match this order");
+        return reply(res, {
+          clientSecret: intent.client_secret,
+          publishableKey: stripePublishable,
+          returnUrl: baseUrl + "/checkout/result" + url.search,
+        });
+      }
+      if (route === "/api/order/quote" && method === "POST") {
+        await limited(req, "quote", 20);
+        const order = await orderAccess(req, url);
+        if (
+          !["btc", "usdt"].includes(order.method) ||
+          !["unpaid", "rejected"].includes(order.payment_status)
+        )
+          fail(409, "This order does not accept a new quote");
+        const details = JSON.parse(order.payment_details || "{}");
+        try {
+          Object.assign(
+            details,
+            await marketQuote(order.method, order.amount_cents, fetcher),
+          );
+          details.quoteRequested = false;
+        } catch {
+          details.quoteRequested = true;
+        }
+        await db
+          .prepare(
+            "UPDATE orders SET payment_details=?,status=? WHERE id=? AND payment_status IN('unpaid','rejected')",
+          )
+          .run(
+            JSON.stringify(details),
+            details.quoteRequested ? "quote_requested" : "pending",
+            order.id,
+          );
+        await audit(db, "customer", "crypto_quote_requested", order.id);
+        return reply(res, { success: true });
       }
       if (route === "/api/order/proof" && method === "POST") {
         await limited(req, "proof", 20);
         const order = await orderAccess(req, url);
-        if (order.method !== "cashapp" || order.payment_status === "paid")
+        if (
+          !isManual(order.method) ||
+          !["unpaid", "rejected"].includes(order.payment_status)
+        )
           fail(409, "This order does not accept a receipt");
+        const reference = text(input.reference, 200);
+        if (
+          ["btc", "usdt"].includes(order.method) &&
+          !(
+            /^[a-fA-F0-9]{64}$/.test(reference) ||
+            (order.method === "usdt" && /^0x[a-fA-F0-9]{64}$/.test(reference))
+          )
+        )
+          fail(400, "Enter the blockchain transaction hash");
+        if (!reference) fail(400, "Enter the transfer reference");
+        if (
+          ["btc", "usdt"].includes(order.method) &&
+          !JSON.parse(order.payment_details || "{}").amount
+        )
+          fail(409, "Wait for an exact crypto amount before sending payment");
         const match =
           typeof input.image === "string" &&
           input.image.match(
             /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/,
           );
-        if (!match) fail(400, "Upload a PNG, JPEG, or WebP receipt");
-        const bytes = Buffer.from(match[2], "base64");
-        if (bytes.length < 12 || bytes.length > RECEIPT_LIMIT)
-          fail(400, "Receipt must be under 3 MB");
-        const valid =
-          match[1] === "png"
-            ? bytes
-                .subarray(0, 8)
-                .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-            : match[1] === "jpeg"
-              ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
-              : bytes.toString("ascii", 0, 4) === "RIFF" &&
-                bytes.toString("ascii", 8, 12) === "WEBP";
-        if (!valid) fail(400, "The file is not a valid receipt image");
-        const receipt = id("receipt") + "." + match[1];
-        await storage.put(receipt, bytes, "image/" + match[1]);
+        if (input.image && !match)
+          fail(400, "Upload a PNG, JPEG, or WebP receipt");
+        if (order.method !== "btc" && order.method !== "usdt" && !match)
+          fail(400, "Upload a receipt image for this transfer");
+        let receipt = null;
+        if (match) {
+          const bytes = Buffer.from(match[2], "base64");
+          if (bytes.length < 12 || bytes.length > RECEIPT_LIMIT)
+            fail(400, "Receipt must be under 3 MB");
+          const valid =
+            match[1] === "png"
+              ? bytes
+                  .subarray(0, 8)
+                  .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+              : match[1] === "jpeg"
+                ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
+                : bytes.toString("ascii", 0, 4) === "RIFF" &&
+                  bytes.toString("ascii", 8, 12) === "WEBP";
+          if (!valid) fail(400, "The file is not a valid receipt image");
+          receipt = id("receipt") + "." + match[1];
+          await storage.put(receipt, bytes, "image/" + match[1]);
+        }
         await db
           .prepare(
-            "UPDATE orders SET receipt=?,reference=?,payment_status='awaiting_review' WHERE id=?",
+            "UPDATE orders SET receipt=?,reference=?,payment_status='awaiting_review' WHERE id=? AND payment_status IN('unpaid','rejected')",
           )
           .run(receipt, text(input.reference, 200), order.id);
         await audit(db, "customer", "receipt_submitted", order.id);
@@ -833,29 +957,97 @@ export async function createApi({
             .prepare("SELECT * FROM orders WHERE id=?")
             .get(text(input.id));
           if (!order) fail(404, "Order not found");
-          if (input.action === "verify_cashapp") {
+          if (input.action === "set_crypto_quote") {
             if (
-              order.method !== "cashapp" ||
+              !["btc", "usdt"].includes(order.method) ||
+              !["unpaid", "rejected"].includes(order.payment_status) ||
+              !validCryptoAmount(input.amount, order.method)
+            )
+              fail(409, "Enter a valid BTC or USDT amount for an unpaid order");
+            const details = JSON.parse(order.payment_details || "{}");
+            Object.assign(details, {
+              amount: input.amount,
+              source: "Administrator quote",
+              quotedAt: now(),
+              expiresAt: new Date(Date.now() + 15 * 60000).toISOString(),
+              quoteRequested: false,
+            });
+            delete details.usdRate;
+            await db
+              .prepare(
+                "UPDATE orders SET payment_details=?,status='pending' WHERE id=? AND payment_status IN('unpaid','rejected')",
+              )
+              .run(JSON.stringify(details), order.id);
+          } else if (
+            input.action === "verify_cashapp" ||
+            input.action === "verify_transfer"
+          ) {
+            if (input.action === "verify_cashapp" && order.method !== "cashapp")
+              fail(
+                409,
+                "Use the verified transfer review action for this order",
+              );
+            if (
+              !isManual(order.method) ||
               order.payment_status !== "awaiting_review" ||
-              !order.receipt ||
-              !text(input.reference)
+              ((order.method === "wire" || order.method === "cashapp") &&
+                !order.receipt) ||
+              !text(input.reference) ||
+              (input.action === "verify_transfer" && input.confirmed !== true)
             )
               fail(
                 409,
                 "A submitted receipt and verified transaction reference are required",
               );
+            if (
+              ["btc", "usdt"].includes(order.method) &&
+              order.reference !== text(input.reference)
+            )
+              fail(
+                409,
+                "The verified transaction hash must match the submitted hash",
+              );
+            const used = await db
+              .prepare(
+                "SELECT id FROM orders WHERE reference=? AND payment_status='paid' AND method=? AND id<>?",
+              )
+              .get(text(input.reference), order.method, order.id);
+            if (used)
+              fail(
+                409,
+                "This transaction reference has already been approved for another order",
+              );
             await db
               .prepare("UPDATE orders SET reference=? WHERE id=?")
               .run(text(input.reference), order.id);
-            await settleOrder(db, order.id, user.id, text(input.reference));
-          } else if (input.action === "reject_cashapp") {
+            const network =
+              JSON.parse(order.payment_details || "{}").network || "";
+            const referenceKey =
+              order.method +
+              ":" +
+              network +
+              ":" +
+              text(input.reference).toLowerCase().replace(/^0x/, "");
+            await settleOrder(
+              db,
+              order.id,
+              user.id,
+              text(input.reference),
+              referenceKey,
+            );
+          } else if (
+            input.action === "reject_cashapp" ||
+            input.action === "reject_transfer"
+          ) {
             if (
-              order.method !== "cashapp" ||
+              !isManual(order.method) ||
               order.payment_status !== "awaiting_review"
             )
               fail(409, "Order is not awaiting review");
             await db
-              .prepare("UPDATE orders SET payment_status='rejected' WHERE id=?")
+              .prepare(
+                "UPDATE orders SET payment_status='rejected' WHERE id=? AND payment_status='awaiting_review'",
+              )
               .run(order.id);
           } else if (input.action === "fulfill") {
             if (order.payment_status !== "paid")
@@ -981,20 +1173,34 @@ export async function createApi({
             payments: await config(),
           });
         if (route === "/api/admin/settings" && method === "PATCH") {
-          if (input.cashTag && !/^\$[A-Za-z0-9]{1,20}$/.test(input.cashTag))
-            fail(400, "Enter a valid $CashTag");
           if (input.supportEmail && !email(input.supportEmail))
             fail(400, "Enter a valid support email");
-          for (const key of [
+          const allowed = [
             "brand",
-            "cashTag",
             "supportEmail",
-            "cryptoEnabled",
-          ])
+            ...Object.keys(PAYMENT_DEFAULTS),
+          ];
+          const current = await settings(db),
+            changes = {};
+          for (const key of allowed)
             if (typeof input[key] === "string")
+              changes[key] = text(
+                input[key],
+                key === "wireInstructions" ? 2000 : 500,
+              );
+          try {
+            validatePaymentSettings({ ...current, ...changes });
+          } catch (error) {
+            fail(400, error.message);
+          }
+          await transaction(db, async () => {
+            for (const [key, value] of Object.entries(changes))
               await db
-                .prepare("UPDATE settings SET value=? WHERE key=?")
-                .run(text(input[key]), key);
+                .prepare(
+                  "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                )
+                .run(key, value);
+          });
           await audit(db, user.id, "settings_updated", "payments");
           return reply(res, { success: true });
         }

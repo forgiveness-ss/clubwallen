@@ -16,6 +16,7 @@ function backend() {
       ].filter(Boolean),
       stripeKey: process.env.STRIPE_SECRET_KEY || "",
       stripeWebhook: process.env.STRIPE_WEBHOOK_SECRET || "",
+      stripePublishable: process.env.STRIPE_PUBLISHABLE_KEY || "",
     }).catch((error) => {
       pending = undefined;
       throw error;

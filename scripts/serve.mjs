@@ -37,6 +37,7 @@ const api = await createApi({
   baseUrl: process.env.APP_BASE_URL || `http://localhost:${port}`,
   stripeKey: process.env.STRIPE_SECRET_KEY || "",
   stripeWebhook: process.env.STRIPE_WEBHOOK_SECRET || "",
+  stripePublishable: process.env.STRIPE_PUBLISHABLE_KEY || "",
 });
 const server = http.createServer(async (req, res) => {
   try {

@@ -41,6 +41,7 @@ export function postgresSql(sql) {
     "audit",
     "settings",
     "rate_limits",
+    "payment_references",
   ]);
   return sql.replace(/'(?:''|[^'])*'|[a-zA-Z_][a-zA-Z_0-9]*|\?/g, (token) => {
     if (token.startsWith("'")) return token;

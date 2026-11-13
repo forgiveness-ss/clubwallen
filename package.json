@@ -13,8 +13,12 @@
     "setup:cloud": "node scripts/setup-cloud.mjs"
   },
   "dependencies": {
+    "@ethersproject/address": "^5.8.0",
+    "@stripe/stripe-js": "^10.3.0",
     "@supabase/supabase-js": "^2.119.0",
     "@vercel/functions": "^3.11.2",
+    "bitcoinjs-lib": "^7.0.5",
+    "bs58check": "^4.0.0",
     "pg": "^8.23.1",
     "react": "19.2.0",
     "react-dom": "19.2.0"

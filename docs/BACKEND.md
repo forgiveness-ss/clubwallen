@@ -1,6 +1,6 @@
 # Backend and CRM
 
-Implemented for a US business, USD prices, cards, supported stablecoins, manual Cash App review, and manually renewed annual memberships.
+Implemented for a US business, USD prices, Apple Pay, manual BTC/USDT wallet transfers, wire transfer review, and manually renewed annual memberships.
 
 ## Structure and storage
 
@@ -34,11 +34,11 @@ Customer signup does not prove email ownership. New accounts therefore cannot re
 | `POST /api/support`, `/api/notify-admin` | Persist support requests |
 | `/api/admin/overview` | Revenue, counts, review queue, recent activity |
 | `/api/admin/customers` | Customer profiles, notes, email-ownership approval |
-| `/api/admin/orders` | Orders, manual Cash App approval, fulfillment |
+| `/api/admin/orders` | Orders, crypto quotes, manual transfer approval, fulfillment |
 | `/api/admin/memberships` | Membership records, suspension/reactivation |
 | `/api/admin/products` | Product names, prices, visibility, stock counts |
 | `/api/admin/messages` | Support conversations and replies |
-| `/api/admin/settings` | Business details, Cash App handle, stablecoin enablement |
+| `/api/admin/settings` | Business details, Apple Pay enablement, receiving wallets, wire details |
 | `/api/admin/receipt` | Authenticated receipt viewing |
 | `/api/admin/activity` | Audit history |
 
@@ -48,11 +48,13 @@ Browser mutations require a matching Origin and JSON content type. Webhooks use 
 
 Checkout reads prices from database product IDs. Browser prices, totals, roles, and payment statuses cannot establish a payable amount or paid state. The copied site's legacy promo codes are not accepted by this checkout; a managed promotion system is not yet implemented.
 
-Stripe sessions use `mode=payment` with USD pricing. Cards use `payment_method_types[]=card`; stablecoins use `payment_method_types[]=crypto`. Memberships do not create subscriptions. Stablecoins require eligibility/enablement in your Stripe account and are capped at $10,000 per order. Bitcoin is not included.
+New orders accept only `applepay`, `btc`, `usdt`, or `wire`. Apple Pay uses server-priced USD PaymentIntents and an Express Checkout Element restricted to Apple Pay. No card entry form or other wallet button is mounted. The signed `payment_intent.succeeded` callback must match the order, currency, exact amount, and test/live mode; the server retrieves the intent and verifies `latest_charge.payment_method_details.card.wallet.type` is `apple_pay` before settlement. Legacy hosted-session callbacks remain available for historical orders.
 
-Returning from checkout does not confirm payment. Stripe events must have a valid signature within a five-minute timestamp window and match the stored session ID, order metadata, amount, currency, and test/live mode. Replay processing does not create duplicate memberships. Confirmed full refunds revoke memberships granted by the order. Partial refunds and disputes still require an operational integration.
+BTC and USDT use administrator-configured receiving wallets. Wallet syntax and checksums are validated. Each order snapshots its destination/network. Quotes use Kraken USD ticker data and integer decimal arithmetic with a 15-minute expiry. If the quote feed fails, the administrator can issue an exact amount. Wire orders snapshot bank instructions. Bank details are returned only to authenticated administrators or holders of that order's private token; public status exposes readiness flags only.
 
-Cash App receipts remain `awaiting_review` until an administrator verifies the actual transfer and records the transaction reference. A screenshot alone cannot mark an order paid. Approvals are audited. Membership access lasts one year after verified payment and renewal never charges automatically.
+Wallet transfer submissions require a blockchain transaction hash; images are optional. Wire submissions require a receipt and bank reference. Transfers remain `awaiting_review` until an administrator confirms independently verified funds. In a settlement transaction, a unique `payment_references` record prevents reuse of the same transfer across orders. Only verified payment activates a membership. Confirmed Stripe full refunds revoke related memberships. Manual transfer refunds, disputes, partial refunds, and inventory reservation/expiry require further operational work.
+
+Memberships last one year and renew manually. No automatic recurring charge is created.
 
 Secrets stay in server environment variables. No real provider request or live financial transaction was made during implementation tests; provider calls are mocked. Test revenue is separated from live revenue in the CRM.
 
@@ -68,6 +70,4 @@ Cloud deployment code is prepared; account provisioning and live integration ver
 
 Only merchandise and membership checkout are connected. Ticket issuance, festival/hotel inventory, charitable donations, livestreams, and other benefits need real fulfillment integrations. A marketing content editor/CMS is not included. Support replies appear in verified customer accounts; outbound email is not sent.
 
-The original NOWPayments provider is not used: its guidance excludes US-registered businesses. Stripe documents stablecoin acceptance for eligible US merchants instead.
-
-Sources: [Stripe Checkout](https://docs.stripe.com/payments/checkout), [Stripe webhooks](https://docs.stripe.com/webhooks), [Stripe stablecoins](https://docs.stripe.com/payments/stablecoin-payments), [NOWPayments US restriction](https://nowpayments.io/blog/are-crypto-payments-legal-in-the-united-states).
+Sources: [Stripe Express Checkout](https://docs.stripe.com/elements/express-checkout-element/accept-a-payment), [Stripe webhooks](https://docs.stripe.com/webhooks), [Kraken market data](https://docs.kraken.com/api-reference/market-data/get-ticker-information).

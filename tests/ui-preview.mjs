@@ -40,6 +40,8 @@ const client = await customer(
   "customer@example.test",
   "Sample Customer",
 );
+for(const [key,value]of Object.entries({btcEnabled:'true',btcAddress:'1BoatSLRHtKNngkdXEeobR76b53LETtpyT',usdtEnabled:'true',usdtNetwork:'ethereum',usdtAddress:'0x742d35cc6634c0532925a3b844bc454e4438f44e',wireEnabled:'true',wireBeneficiary:'Preview Store',wireBank:'Example Bank',wireAccount:'123456789',wireRouting:'021000021',wireBankAddress:'1 Example Street',wireBeneficiaryAddress:'2 Example Street'}))await api.db.prepare('UPDATE settings SET value=? WHERE key=?').run(value,key);
+await api.db.prepare('INSERT INTO orders(id,customer_id,method,amount_cents,items,access_token_hash,provider_mode,created_at,payment_details) VALUES(?,?,?,?,?,?,?,?,?)').run('qa-btc',client.id,'btc',35000,JSON.stringify([{productId:'membership-crew',name:'Crew membership',kind:'membership',quantity:1,size:'M',unitPrice:35000}]),createHash('sha256').update(token).digest('hex'),'live',now(),JSON.stringify({type:'crypto',asset:'BTC',network:'bitcoin',address:'1BoatSLRHtKNngkdXEeobR76b53LETtpyT',amount:'0.00500000',source:'Preview quote',expiresAt:new Date(Date.now()+15*60000).toISOString()}));
 await api.db
   .prepare(
     "INSERT INTO messages(id,customer_id,subject,body,created_at) VALUES(?,?,?,?,?)",
@@ -53,6 +55,7 @@ await api.db
   );
 const root = new URL("../dist/", import.meta.url).pathname;
 const server = http.createServer(async (req, res) => {
+  if(req.url==='/__qa_order'){res.writeHead(302,{Location:'/checkout/result?order=qa-btc&token='+token});res.end();return;}
   if (req.url === "/__qa_enter") {
     res.writeHead(302, {
       "Set-Cookie": `exclusive_session=${token}; HttpOnly; SameSite=Strict; Path=/`,

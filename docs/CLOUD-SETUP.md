@@ -20,7 +20,7 @@ npm ci
 npm run setup:cloud
 ```
 
-This applies `supabase/migrations/001_crm.sql` inside a transaction, seeds missing products/settings without overwriting CRM changes, and creates or secures the `payment-receipts` bucket as private. Allowed images are PNG/JPEG/WebP up to 3 MB. The migration uses a private schema and does not expose customer tables through Supabase's public Data API. Run setup separately from the Vercel build; builds never migrate a production database automatically.
+This applies the versioned SQL migrations in `supabase/migrations/` inside a transaction, seeds missing products/settings without overwriting CRM changes, and creates or secures the `payment-receipts` bucket as private. Allowed images are PNG/JPEG/WebP up to 3 MB. The migration uses a private schema and does not expose customer tables through Supabase's public Data API. Run setup separately from the Vercel build; builds never migrate a production database automatically.
 
 If a migration connection is needed, set `DATABASE_MIGRATION_URL` to the project's session pooler connection. A migration may use this override while runtime requests use the transaction pooler. TLS certificate verification remains enabled.
 
@@ -43,9 +43,10 @@ The existing local database currently has no accounts, customers, orders, member
 | `ADMIN_SETUP_TOKEN` | A privately generated random secret of at least 32 characters |
 | `ADMIN_EMAIL` | Your administrator email (recommended) |
 | `STRIPE_SECRET_KEY` | Your Stripe test secret key to begin |
+| `STRIPE_PUBLISHABLE_KEY` | Matching Stripe publishable key, e.g. `pk_test_…` |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for this deployment's Stripe webhook |
 
-The database/storage variables are required for the API. Payment keys can be omitted while setting up the CRM; card and crypto checkout stay unavailable. Use separate Supabase projects and Stripe test credentials for preview/testing. Do not attach production secrets to untrusted preview branches.
+The database/storage variables are required for the API. Payment keys can be omitted while setting up the CRM; Apple Pay stays unavailable until configured. Use separate Supabase projects and Stripe test credentials for preview/testing. Do not attach production secrets to untrusted preview branches.
 
 4. Deploy or redeploy after environment changes. Deploying the complete repository includes both the website/CRM and `api/index.js`; Supabase remains a separate persistent service.
 5. Public visitors should use the **production domain**. Check Vercel Deployment Protection if the production website asks for a Vercel login. The CRM has its own administrator login at `/admin`; visitors do not need ChatGPT accounts.
@@ -56,14 +57,18 @@ Open `https://YOUR-DOMAIN/admin`. Enter your name, configured owner email, a pas
 
 If `/admin` cannot check setup, it shows a connection error and a retry button. Open `/api/status` for a safe configuration error. In particular, `APP_BASE_URL` in Vercel must be your actual HTTPS production origin, rather than the localhost value in `.env.example`. Fix the named Production environment variables and redeploy; adding `ADMIN_EMAIL` alone does not create an account.
 
-In CRM → Payment settings, enter your Cash App handle. Cards and supported stablecoins are automatically marked paid only after verified Stripe webhooks. Cash App receipts require an administrator to verify the transfer and record its reference before approval. Memberships renew manually each year.
+In CRM → Payment settings, configure the receiving Bitcoin address, USDT network/address, and wire beneficiary/bank/account instructions, then enable each completed method. These destinations are validated before saving and captured per order. Wallet transfers and wire receipts require independent administrator verification; a submission alone never marks an order paid. The same transfer reference cannot be approved for multiple orders. Memberships renew manually each year.
 
-## Connect Stripe and verify
+## Connect Apple Pay and verify
 
-Register `https://YOUR-DOMAIN/api/webhooks/stripe` in Stripe, selecting `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `charge.refunded`. Save its signing secret in Vercel and redeploy. Enable stablecoins in Stripe before enabling them in CRM settings. No Bitcoin integration is included.
+Set matching `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, and `STRIPE_WEBHOOK_SECRET` values in Vercel. In Stripe, register your production/custom domain under payment method domains for both test and live environments. Apple Pay requires HTTPS and a supported customer device/browser with Apple Wallet. Enable Apple Pay in CRM settings after configuring Stripe.
 
-Check `/api/status`, create the owner account, complete a Stripe **test** payment, confirm one membership grant, submit a Cash App test receipt, and confirm anonymous requests cannot view `/api/admin/receipt`. Then redeploy and confirm records and private receipt access persist. Live checkout requires your merchant configuration and a separate live verification.
+Register `https://YOUR-DOMAIN/api/webhooks/stripe` in Stripe, selecting `payment_intent.succeeded` and `charge.refunded`. Retain `checkout.session.completed` and `checkout.session.async_payment_succeeded` only if you still need callbacks for historical orders. Save the endpoint signing secret in Vercel and redeploy. Ordinary card entry, Google Pay, Cash App, and Stripe stablecoin checkout are not offered for new orders.
+
+BTC and USDT are manual wallet transfers, not Stripe payments. The server requests a USD market quote from Kraken and calculates the exact asset amount with decimal arithmetic, rounded up to BTC's eight or USDT's six decimal places. Quotes expire in 15 minutes. If quotes are unavailable, the order enters `quote_requested`; the administrator can issue an exact amount from Orders & payments → Review. Customers must wait for a valid quote before transferring and submit the blockchain transaction hash. Approval requires checking the destination, network, amount, and confirmations in the receiving wallet. A wire approval requires a receipt and a verified bank reference.
+
+Check `/api/status`, create/sign into the owner account, save real receiving details, and verify the desired methods are enabled. Test Apple Pay on a supported device and confirm exactly one membership grant from a signed callback. Submit a test transfer for review, confirm it remains unpaid until verified, and confirm anonymous requests cannot view `/api/admin/receipt`. Then redeploy and confirm records and private receipt access persist. Live wallet, bank, and Apple Pay transactions have not been performed by the automated suite.
 
 The automated suite covers SQLite and an embedded PostgreSQL engine, raw signed callback bodies, account isolation, CRM queries, setup protection, receipt authorization, and durable rate counters. It does not establish that a live Supabase project, Vercel deployment, or merchant account is configured.
 
-Official references: [Supabase connections](https://supabase.com/docs/guides/database/connecting-to-postgres), [private storage buckets](https://supabase.com/docs/guides/storage/buckets/fundamentals), [Vercel Node functions](https://vercel.com/docs/functions/runtimes/node-js), [Vercel configuration](https://vercel.com/docs/project-configuration/vercel-json), [Stripe webhooks](https://docs.stripe.com/webhooks).
+Official references: [Supabase connections](https://supabase.com/docs/guides/database/connecting-to-postgres), [private storage buckets](https://supabase.com/docs/guides/storage/buckets/fundamentals), [Vercel Node functions](https://vercel.com/docs/functions/runtimes/node-js), [Vercel configuration](https://vercel.com/docs/project-configuration/vercel-json), [Stripe webhooks](https://docs.stripe.com/webhooks), [Apple Pay domain registration](https://docs.stripe.com/payments/payment-methods/pmd-registration), [Kraken public tickers](https://docs.kraken.com/api-reference/market-data/get-ticker-information).

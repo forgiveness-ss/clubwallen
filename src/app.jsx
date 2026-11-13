@@ -60,7 +60,7 @@ function App(){
   else if(siteConfig.mode==='local'&&path==='/login')Page=CustomerAuth;
   else if(siteConfig.mode==='local'&&path==='/signup')Page=()=> <CustomerAuth signup/>;
   else if(siteConfig.mode==='local'&&(path==='/dashboard'||path==='/portal'))Page=CustomerAccount;
-  else if(path==='/checkout/crypto')Page=PaymentPreview;
+  else if(path==='/checkout/crypto'||path==='/checkout/cashapp')Page=StoreCheckout;
   else if(path==='/dashboard'||path==='/portal')Page=loadComponent(78928).default;
   else if(routes[path]?.module)Page=loadComponent(routes[path].module).default;
   else if(routes[path]?.html)Page=()=> <div dangerouslySetInnerHTML={{__html:legalContent[path]||''}}/>;

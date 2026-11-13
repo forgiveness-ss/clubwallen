@@ -130,6 +130,15 @@ test("Cloud setup diagnoses certificate, credential and provider failures withou
   }
 });
 
+const WIRE_SETTINGS = {
+  wireEnabled: "true",
+  wireBeneficiary: "Fixture Owner",
+  wireBank: "Fixture Bank",
+  wireAccount: "123456789",
+  wireRouting: "021000021",
+  wireBankAddress: "1 Test Street, NY",
+  wireBeneficiaryAddress: "2 Test Street, NY",
+};
 const origin = "https://club.example";
 const password = "CloudFixturePassword!2026";
 const receipt =
@@ -164,17 +173,35 @@ async function fixture() {
     adminEmail: "owner@example.com",
     stripeKey: "sk_test_fixture",
     stripeWebhook: "whsec_fixture",
+    stripePublishable: "pk_test_fixture",
     receipts: {
       put: async (name, bytes) => {
         files.set(name, bytes);
       },
       get: async (name) => files.get(name),
     },
-    fetcher: async () =>
-      Response.json({
-        id: "cs_" + ++number,
-        url: "https://checkout.stripe.com/c/pay/fixture",
-      }),
+    fetcher: async (url, request) => {
+      if (request.method === "POST") {
+        const form = request.body;
+        options.lastOrderId = form.get("metadata[order_id]");
+        return Response.json({
+          id: "pi_fixture_" + ++number,
+          client_secret: "pi_fixture_secret_test",
+        });
+      }
+      return Response.json({
+        id: "pi_fixture_1",
+        status: "succeeded",
+        amount: 35000,
+        amount_received: 35000,
+        currency: "usd",
+        livemode: false,
+        metadata: { order_id: options.lastOrderId },
+        latest_charge: {
+          payment_method_details: { card: { wallet: { type: "apple_pay" } } },
+        },
+      });
+    },
   };
   const api = await createApi(options);
   async function call(
@@ -256,7 +283,7 @@ test("PostgreSQL schema, protected cloud setup, CRM, private receipts and one-ti
         await call("/api/admin/settings", {
           method: "PATCH",
           cookie,
-          data: { cashTag: "$FixtureBusiness" },
+          data: WIRE_SETTINGS,
         })
       ).status,
       200,
@@ -286,7 +313,7 @@ test("PostgreSQL schema, protected cloud setup, CRM, private receipts and one-ti
     const orderInput = {
       name: "Member",
       email: "member@example.com",
-      method: "cashapp",
+      method: "wire",
       items: [{ productId: "membership-crew", quantity: 1, size: "M" }],
     };
     const checkout = await call("/api/orders", {
@@ -320,7 +347,8 @@ test("PostgreSQL schema, protected cloud setup, CRM, private receipts and one-ti
       cookie,
       data: {
         id: checkout.json.orderId,
-        action: "verify_cashapp",
+        action: "verify_transfer",
+        confirmed: true,
         reference: "verified-ref",
       },
     });
@@ -407,10 +435,15 @@ test("PostgreSQL webhook verification preserves raw bytes, rolls back stock conf
         setupToken: "fixture-setup-token",
       },
     });
+    await f.call("/api/admin/settings", {
+      method: "PATCH",
+      cookie: owner.cookie,
+      data: { applePayEnabled: "true" },
+    });
     const input = {
       name: "Customer",
       email: "customer@example.com",
-      method: "card",
+      method: "applepay",
       items: [{ productId: "membership-crew", quantity: 1, size: "M" }],
     };
     const checkout = await f.call("/api/orders", {
@@ -420,16 +453,16 @@ test("PostgreSQL webhook verification preserves raw bytes, rolls back stock conf
     assert.equal(checkout.status, 201);
     const event = {
       id: "evt_raw",
-      type: "checkout.session.completed",
+      type: "payment_intent.succeeded",
       livemode: false,
       data: {
         object: {
-          id: "cs_1",
+          id: "pi_fixture_1",
           client_reference_id: checkout.json.orderId,
           metadata: { order_id: checkout.json.orderId },
-          amount_total: 35000,
+          amount_received: 35000,
           currency: "usd",
-          payment_status: "paid",
+          status: "succeeded",
           payment_intent: "pi_fixture",
         },
       },

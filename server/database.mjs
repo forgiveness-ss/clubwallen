@@ -2,6 +2,7 @@ import { sqliteAdapter, connectPostgres } from "./sql.mjs";
 import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { PAYMENT_DEFAULTS } from "./payment-settings.mjs";
 export const now = () => new Date().toISOString();
 export const id = (prefix) => `${prefix}_${randomUUID()}`;
 export async function openDatabase(filename, { databaseUrl } = {}) {
@@ -44,6 +45,18 @@ export async function openDatabase(filename, { databaseUrl } = {}) {
   db.exec(
     "CREATE TABLE IF NOT EXISTS rate_limits(key TEXT PRIMARY KEY,hits INTEGER NOT NULL,expires_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS rate_limits_expiry ON rate_limits(expires_at)",
   );
+  if (
+    !db
+      .prepare("PRAGMA table_info(orders)")
+      .all()
+      .some((c) => c.name === "payment_details")
+  )
+    db.exec(
+      "ALTER TABLE orders ADD COLUMN payment_details TEXT NOT NULL DEFAULT '{}'",
+    );
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS payment_references(reference TEXT PRIMARY KEY,order_id TEXT NOT NULL REFERENCES orders(id))",
+  );
   const seed = JSON.parse(
     readFileSync(new URL("./catalog.json", import.meta.url), "utf8"),
   );
@@ -69,6 +82,7 @@ export async function openDatabase(filename, { databaseUrl } = {}) {
     cashTag: "",
     supportEmail: "",
     cryptoEnabled: "false",
+    ...PAYMENT_DEFAULTS,
   }))
     db.prepare("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)").run(
       key,
@@ -127,10 +141,17 @@ export function orderView(row) {
     ...row,
     items: JSON.parse(row.items),
     address: JSON.parse(row.address),
+    payment_details: JSON.parse(row.payment_details || "{}"),
     access_token_hash: undefined,
   };
 }
-export async function settleOrder(db, orderId, actor, paymentId = null) {
+export async function settleOrder(
+  db,
+  orderId,
+  actor,
+  paymentId = null,
+  referenceKey = null,
+) {
   return await transaction(db, async () => {
     const order = await db
       .prepare(
@@ -140,6 +161,20 @@ export async function settleOrder(db, orderId, actor, paymentId = null) {
       .get(orderId);
     if (!order) throw Error("Order not found");
     if (order.payment_status === "paid") return false;
+    if (referenceKey) {
+      const inserted = await db
+        .prepare(
+          "INSERT OR IGNORE INTO payment_references(reference,order_id) VALUES(?,?)",
+        )
+        .run(referenceKey, orderId);
+      if (!inserted.changes) {
+        const error = Error(
+          "This transfer has already been approved for another order",
+        );
+        error.status = 409;
+        throw error;
+      }
+    }
     if (db.dialect === "postgres")
       await db
         .prepare("SELECT id FROM customers WHERE id=? FOR UPDATE")

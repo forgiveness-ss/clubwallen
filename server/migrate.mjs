@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { PAYMENT_DEFAULTS } from "./payment-settings.mjs";
 
 export async function migrate(db) {
   if (db.dialect !== "postgres")
@@ -16,18 +17,38 @@ export async function migrate(db) {
     await db.exec(
       "CREATE SCHEMA IF NOT EXISTS clubwallen; CREATE TABLE IF NOT EXISTS clubwallen.schema_migrations(version TEXT PRIMARY KEY,checksum TEXT NOT NULL,applied_at TEXT NOT NULL); LOCK TABLE clubwallen.schema_migrations IN EXCLUSIVE MODE",
     );
-    const previous = await db
-      .prepare(
-        "SELECT checksum FROM clubwallen.schema_migrations WHERE version=?",
-      )
-      .get("001");
-    if (previous && previous.checksum !== checksum)
-      throw Error("Applied migration was changed; add a new migration instead");
-    if (!previous) {
-      await db.exec(sql);
-      await db
-        .prepare("INSERT INTO clubwallen.schema_migrations VALUES(?,?,?)")
-        .run("001", checksum, new Date().toISOString());
+    for (const [version, source] of [
+      ["001", sql],
+      [
+        "002",
+        await readFile(
+          new URL(
+            "../supabase/migrations/002_payment_instructions.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      ],
+    ]) {
+      const digest =
+        version === "001"
+          ? checksum
+          : createHash("sha256").update(source).digest("hex");
+      const previous = await db
+        .prepare(
+          "SELECT checksum FROM clubwallen.schema_migrations WHERE version=?",
+        )
+        .get(version);
+      if (previous && previous.checksum !== digest)
+        throw Error(
+          "Applied migration was changed; add a new migration instead",
+        );
+      if (!previous) {
+        await db.exec(source);
+        await db
+          .prepare("INSERT INTO clubwallen.schema_migrations VALUES(?,?,?)")
+          .run(version, digest, new Date().toISOString());
+      }
     }
     for (const [index, p] of catalog.entries()) {
       await db
@@ -53,6 +74,7 @@ export async function migrate(db) {
       cashTag: "",
       supportEmail: "",
       cryptoEnabled: "false",
+      ...PAYMENT_DEFAULTS,
     })) {
       await db
         .prepare("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)")

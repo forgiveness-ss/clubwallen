@@ -22,8 +22,8 @@ const outputRoutes=[...new Set([...Object.keys(routes),'/dashboard','/portal','/
 for(const route of outputRoutes){
  const destination=route==='/'?path.join(out,'index.html'):path.join(out,route.slice(1),'index.html');
  await mkdir(path.dirname(destination),{recursive:true});
- let html=shell;
- if(route!=='/'){
+ let html=/^\/(admin|checkout|login|signup|dashboard|portal)(\/|$)/.test(route)?shell.replace(capturedBody,''):shell;
+ if(route!=='/'&&!/^\/(admin|checkout|login|signup|dashboard|portal)(\/|$)/.test(route)){
   try{const reference=await readFile(path.join(root,'src/snapshots',route.slice(1)+'.html'),'utf8');const body=captureBody(reference);html=shell.replace(capturedBody,body);}catch{html=shell.replace(capturedBody,'');}
  }
  await writeFile(destination,html);

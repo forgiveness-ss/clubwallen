@@ -19,7 +19,7 @@ npm run dev
 
 On your first CRM visit, create your own administrator account. There is no default administrator password. Customer signup creates a separate customer account without administrator privileges.
 
-Records persist in `.data/exclusive.sqlite`. Private Cash App receipt images are stored in `.data/receipts/`. These files and `.env` are excluded from Git and the static website output. Back up the entire `.data/` directory before moving this installation.
+Records persist in `.data/exclusive.sqlite`. Private transfer receipt images are stored in `.data/receipts/`. These files and `.env` are excluded from Git and the static website output. Back up the entire `.data/` directory before moving this installation.
 
 After frontend edits, run `npm run build` and refresh. Restart after backend or environment changes. The server binds only to loopback.
 
@@ -30,12 +30,14 @@ npm run check
 
 ## Payments: United States, USD, manual annual renewal
 
-- **Cards:** Stripe hosted Checkout, server-calculated USD prices, signed webhooks.
-- **Crypto:** Stripe supported stablecoins such as USDC. Enable stablecoins in your Stripe account and then in CRM payment settings. Bitcoin is not implemented.
-- **Manual Cash App:** configure your own `$CashTag` in CRM settings. Receipts enter an awaiting-review queue. An administrator must independently verify the transfer and supply a transaction reference before approval.
-- **Memberships:** one-year purchases with manual renewal. No automatic recurring charge is created.
+- **Apple Pay:** an Apple Pay-only Stripe Express Checkout button; no standalone card-entry form. Automatic confirmation requires a signed webhook and a verified Apple Pay wallet charge.
+- **Bitcoin and USDT:** transfers to receiving addresses configured in the CRM. BTC uses Bitcoin mainnet; USDT supports one selected Ethereum/ERC-20 or Tron/TRC-20 receiving network. An administrator verifies each transaction before approval.
+- **Wire transfer:** USD bank instructions configured in the CRM. Customers submit a private receipt and bank reference; approval requires verification of received funds.
+- **Memberships:** one-year purchases with manual renewal. No subscription is created.
 
-Copy `.env.example` to `.env`, supply your Stripe test secret key and webhook signing secret, and restart. Never put secret keys in frontend code. For local webhook testing with the official Stripe CLI:
+Cash App, standalone cards, and Stripe USDC are no longer offered for new orders. Receiving details are captured per order; settings changes affect new orders. Crypto amounts use a 15-minute market quote when available; administrators can issue exact quotes when the price feed is unavailable.
+
+Copy `.env.example` to `.env`, supply your Stripe test secret key, publishable key, and webhook signing secret, and restart. Never put secret keys in frontend code. For local webhook testing with the official Stripe CLI:
 
 ```sh
 stripe listen --forward-to localhost:4173/api/webhooks/stripe
