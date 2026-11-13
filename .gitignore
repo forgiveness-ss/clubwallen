@@ -3,6 +3,9 @@ dist/
 reference/
 .env
 .env.*
+!.env.example
 *.tgz
 *.tar.gz
 .DS_Store
+.data/
+coverage/

@@ -1,3 +1,4 @@
+import {siteConfig} from '../site.config.js';
 export default (e) => {
   "use strict";
   var t = e.i(40450),
@@ -197,7 +198,12 @@ export default (e) => {
       let e = (0, i.useRouter)(),
         [n, s] = (0, r.useState)("All"),
         [l, c] = (0, r.useState)({}),
-        d = "All" === n ? a : a.filter((e) => e.category === n);
+        [catalog,setCatalog] = (0,r.useState)(a),
+        d = "All" === n ? catalog : catalog.filter((e) => e.category === n);
+      (0,r.useEffect)(()=>{
+        if(siteConfig.mode!=='local')return;
+        fetch('/api/catalog').then(res=>{if(!res.ok)throw Error('Catalog unavailable');return res.json();}).then(data=>setCatalog(data.products.filter(p=>p.kind==='merch').map(p=>{const original=a.find(i=>i.id===p.id)||{};return {...original,...p,price:p.price_cents/100,category:original.category||p.category,tag:original.tag||''};}))).catch(()=>{});
+      },[]);
       return (0, t.jsx)("div", {
         style: {
           minHeight: "100vh",

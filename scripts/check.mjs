@@ -4,6 +4,7 @@ import React from 'react';
 import {renderToString} from 'react-dom/server';
 import {loadComponent} from '../src/runtime.js';
 import {installServices,stripPasswords,getSupabaseBrowserClient} from '../src/services.js';
+import {siteConfig} from '../src/site.config.js';
 const routes=JSON.parse(await readFile(new URL('../src/routes.json',import.meta.url),'utf8'));
 globalThis.window={location:{pathname:'/',search:'',hash:'',href:'https://rebuild.example/'},fetch:async()=>{throw Error('Unexpected external API call')}};
 globalThis.location={href:'https://rebuild.example/',origin:'https://rebuild.example'};
@@ -22,6 +23,7 @@ for(const[route,config]of Object.entries(routes)){
  }
  const target=new URL('../dist'+(route==='/'?'':route)+'/index.html',import.meta.url);assert.ok((await stat(target)).isFile());
 }
+siteConfig.mode='demo';
 installServices();
 assert.deepEqual(stripPasswords({password:'secret',form:{confirmPassword:'secret',email:'demo@example.com'}}),{form:{email:'demo@example.com'}});
 localStorage.setItem('cw_cashapp_order',JSON.stringify({form:{password:'secret',confirmPassword:'secret',email:'demo@example.com'}}));

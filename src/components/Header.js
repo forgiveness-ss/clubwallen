@@ -1,3 +1,4 @@
+import {siteConfig} from '../site.config.js';
 export default (e) => {
   "use strict";
   var t = e.i(40450),
@@ -21,6 +22,7 @@ export default (e) => {
           let e = JSON.parse(localStorage.getItem("cw_cart") || "[]");
           f(e.reduce((e, t) => e + t.quantity, 0));
         } catch {}
+        if(siteConfig.mode==='local')fetch('/api/auth/me').then(res=>res.json()).then(data=>u(!!data.user)).catch(()=>u(false));
         return () => window.removeEventListener("scroll", e);
       }, [d]),
         (0, r.useEffect)(() => {

@@ -5,12 +5,15 @@ import {loadComponent} from './runtime.js';
 import {installServices,getSupabaseBrowserClient} from './services.js';
 import {useLocation,navigate,Link} from './navigation.js';
 import {siteConfig} from './site.config.js';
+import Admin from './Admin.jsx';
+import {StoreCheckout,OrderResult,CustomerAuth,CustomerAccount} from './Commerce.jsx';
 installServices();
 const Header=loadComponent(70119).default;
 const legalContent=globalThis.__RESERVE_STATIC_PAGES__||{};
 function Notice({path}){
+  if(siteConfig.mode==='local'&&['/checkout','/checkout/result','/login','/signup','/dashboard','/portal'].includes(path))return null;
   if(!/^\/(login|signup|checkout|confirmation|support|donate|dashboard|portal)/.test(path)&&!path.endsWith('/checkout'))return null;
-  return <aside className="demo-notice" role="note">Private rebuild · Demo mode. No payments are collected or messages emailed.{path==='/login'&&<span> Sign in: <strong>demo@example.com</strong> / <strong>ReserveDemo2026!</strong></span>}</aside>;
+  return <aside className="demo-notice" role="note">{siteConfig.mode==='local'?path==='/support'?'Messages are saved to the support inbox. Replies are available in your customer account; email delivery is not configured.':'Reference preview: event, hotel, donation, and legacy checkout screens are not connected to live inventory or payments.':'Private rebuild · Demo mode. No payments are collected or messages emailed.'}{siteConfig.mode==='demo'&&path==='/login'&&<span> Sign in: <strong>demo@example.com</strong> / <strong>ReserveDemo2026!</strong></span>}</aside>;
 }
 function PaymentPreview(){
   let order;try{order=JSON.parse(sessionStorage.getItem('reserve_crypto_order'));}catch{}
@@ -51,11 +54,18 @@ function App(){
     });observer.observe(document.getElementById('root'),{childList:true,subtree:true});return()=>observer.disconnect();
   },[path]);
   let Page;
-  if(path==='/checkout/crypto')Page=PaymentPreview;
+  if(path==='/admin'||path.startsWith('/admin/'))Page=Admin;
+  else if(siteConfig.mode==='local'&&path==='/checkout')Page=StoreCheckout;
+  else if(siteConfig.mode==='local'&&path==='/checkout/result')Page=OrderResult;
+  else if(siteConfig.mode==='local'&&path==='/login')Page=CustomerAuth;
+  else if(siteConfig.mode==='local'&&path==='/signup')Page=()=> <CustomerAuth signup/>;
+  else if(siteConfig.mode==='local'&&(path==='/dashboard'||path==='/portal'))Page=CustomerAccount;
+  else if(path==='/checkout/crypto')Page=PaymentPreview;
   else if(path==='/dashboard'||path==='/portal')Page=loadComponent(78928).default;
   else if(routes[path]?.module)Page=loadComponent(routes[path].module).default;
   else if(routes[path]?.html)Page=()=> <div dangerouslySetInnerHTML={{__html:legalContent[path]||''}}/>;
   else Page=NotFound;
-  return <><Header/><main><Notice path={path}/><ErrorBoundary key={path+'?'+current.split('?')[1]?.split('#')[0]}><Page/></ErrorBoundary></main>{cookies&&<CookieChoices onClose={()=>setCookies(false)}/>}</>;
+  const isAdmin=path==='/admin'||path.startsWith('/admin/');
+  return <>{!isAdmin&&<Header/>}<main>{!isAdmin&&<Notice path={path}/>}<ErrorBoundary key={path+'?'+current.split('?')[1]?.split('#')[0]}><Page/></ErrorBoundary></main>{cookies&&<CookieChoices onClose={()=>setCookies(false)}/>}</>;
 }
 createRoot(document.getElementById('root')).render(<App/>);

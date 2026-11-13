@@ -113,7 +113,7 @@ export default (e) => {
                 (0, t.jsxs)("p", {
                   style: { fontSize: 14, color: "#5a5040", lineHeight: 1.8 },
                   children: [
-                    "Your demo message has been saved in this browser. No email has been sent.",
+                    "Your message has been saved to our support inbox. Sign in with the same email address to view replies in your account.",
                     u
                       ? ""
                       : " Connect your own support service before launching.",

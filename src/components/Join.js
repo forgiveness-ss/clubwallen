@@ -1,3 +1,4 @@
+import {siteConfig} from '../site.config.js';
 export default (e) => {
   "use strict";
   var r = e.i(40450),
@@ -25,9 +26,14 @@ export default (e) => {
   function s() {
     let e = (0, i.useRouter)(),
       s = (0, i.useSearchParams)().get("tier") || "crew",
-      l = o[s] || o.crew,
+      [plans,setPlans] = (0,t.useState)(o),
+      l = plans[s] || plans.crew,
       [c, p] = (0, t.useState)("M"),
       d = "#c8a84b";
+    (0,t.useEffect)(()=>{
+      if(siteConfig.mode!=='local')return;
+      fetch('/api/catalog').then(res=>res.json()).then(data=>setPlans(Object.fromEntries(data.products.filter(p=>p.kind==='membership').map(p=>{const key=p.id.replace('membership-','');return [key,{...o[key],name:`Club Wallen: ${p.name} — 2026 Membership`,price:p.price_cents/100}];})))).catch(()=>{});
+    },[]);
     return (0, r.jsx)("div", {
       style: {
         minHeight: "100vh",
@@ -80,7 +86,7 @@ export default (e) => {
               marginBottom: 40,
               flexWrap: "wrap",
             },
-            children: Object.entries(o).map(([e, t]) =>
+            children: Object.entries(plans).map(([e, t]) =>
               (0, r.jsxs)(
                 n.default,
                 {
@@ -187,6 +193,7 @@ export default (e) => {
                 onClick: () => {
                   let r = new URLSearchParams({
                     type: "membership",
+                    productId: 'membership-'+s,
                     name: l.name,
                     price: String(l.price),
                     size: c,

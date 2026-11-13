@@ -1,0 +1,347 @@
+[
+  {
+    "id": "reserve-hoodie",
+    "name": "Reserve Hoodie",
+    "category": "hoodies",
+    "price": 69.99,
+    "image": "/merch/reserve-hoodie.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "tag": "BESTSELLER",
+    "description": "Premium heavyweight pullover hoodie in black with gold embroidered Reserve logo.",
+    "kind": "merch",
+    "price_cents": 6999,
+    "currency": "usd"
+  },
+  {
+    "id": "mw-tour2026-signed-guitar",
+    "name": "Morgan Wallen Tour 2026 Limited Collector Acoustic Guitar",
+    "category": "instruments",
+    "price": 620.99,
+    "image": "/merch/mw-tour2026-signed-guitar.jpg",
+    "sizes": [
+      "newcollection"
+    ],
+    "tag": "Collector's Item",
+    "description": "Celebrate the 'Still The Problem' Tour 2026 with this exclusive Morgan Wallen collector acoustic guitar. Showcasing custom full-body artwork, signature-inspired detailing, and a handcrafted natural wood design, this limited-edition piece comes complete with a Certificate of Authenticity. A standout display item and keepsake created for serious collectors and Morgan Wallen fans.",
+    "kind": "merch",
+    "price_cents": 62099,
+    "currency": "usd"
+  },
+  {
+    "id": "mw-collector-turntable",
+    "name": "Morgan Wallen Collector's Edition Bluetooth Turntable",
+    "category": "newcollection",
+    "price": 150.99,
+    "image": "/merch/mw-collector-turntable.jpg",
+    "sizes": [
+      "Standard"
+    ],
+    "tag": "Limited Edition",
+    "description": "Exclusive Morgan Wallen collector's edition portable Bluetooth turntable featuring custom artwork, built-in stereo speakers, wireless streaming, rechargeable battery, and 33/45 RPM vinyl playback. Crafted for music lovers and collectors seeking a unique listening experience.",
+    "kind": "merch",
+    "price_cents": 15099,
+    "currency": "usd"
+  },
+  {
+    "id": "mw-clemson",
+    "name": "Morgan Wallen Norris Bear Shirt",
+    "category": "newcollection",
+    "price": 50.99,
+    "image": "/merch/norris-bear-t-shirt.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "tag": "Limited Edition",
+    "description": "Norris bear t-shirt.",
+    "kind": "merch",
+    "price_cents": 5099,
+    "currency": "usd"
+  },
+  {
+    "id": "mw-cl",
+    "name": "Morgan Wallen Norris Bear Hat",
+    "category": "hats",
+    "price": 35.99,
+    "image": "/merch/norris-bear-hat.jpg",
+    "sizes": [
+      "One Size"
+    ],
+    "tag": "Limited Edition",
+    "description": "Norris bear hat.",
+    "kind": "merch",
+    "price_cents": 3599,
+    "currency": "usd"
+  },
+  {
+    "id": "ls-tee",
+    "name": "I Am The Problem Long Sleeve Baby Tee",
+    "category": "tees",
+    "price": 44.99,
+    "image": "/merch/i-am-the-problem.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "tag": "",
+    "description": "Natural micro rib long sleeve baby tee featuring screen printed graphics on front, back, and sleeves.",
+    "kind": "merch",
+    "price_cents": 4499,
+    "currency": "usd"
+  },
+  {
+    "id": "mw-been-bynow-tshirt",
+    "name": "Been By Now T Shirt",
+    "category": "tees",
+    "price": 50.99,
+    "image": "/merch/bbt.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "tag": "LIMITED",
+    "description": "Blue garment dyed pocket t-shirt featuring a printed logo on the front pocket and screen printed graphics on the back.",
+    "kind": "merch",
+    "price_cents": 5099,
+    "currency": "usd"
+  },
+  {
+    "id": "ty-tee",
+    "name": "Thank Yew T Shirt",
+    "category": "hats",
+    "price": 39.99,
+    "image": "/merch/thank-yew-t-shirt.jpg",
+    "sizes": [
+      "One Size"
+    ],
+    "tag": "LIMITED",
+    "description": "Espresso garment dyed t-shirt featuring screen printed graphics on front and sleeve.",
+    "kind": "merch",
+    "price_cents": 3999,
+    "currency": "usd"
+  },
+  {
+    "id": "dwzu-hoodie",
+    "name": "Dont We Zip Up Hoodie",
+    "category": "jackets",
+    "price": 80.99,
+    "image": "/merch/dont-we-zip-up-hopdie.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "tag": "NEW",
+    "description": "Army green midweight full zip hoodie featuring screen printed graphics on front and back.",
+    "kind": "merch",
+    "price_cents": 8099,
+    "currency": "usd"
+  },
+  {
+    "id": "wallen-hunting-hat",
+    "name": "Hunting Hat",
+    "category": "hats",
+    "price": 44.99,
+    "image": "/merch/wallen-hunting-hat.jpg",
+    "sizes": [
+      "One Size"
+    ],
+    "tag": "",
+    "description": "Natural and black two tone hat featuring embroidered graphics on front.",
+    "kind": "merch",
+    "price_cents": 4499,
+    "currency": "usd"
+  },
+  {
+    "id": "bl-tee",
+    "name": "Blue Jersey",
+    "category": "newcollection",
+    "price": 99.99,
+    "image": "/merch/bl-tee.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "tag": "NEW",
+    "description": "Custom Order Morgan Wallen Tennessee Vols Football Jersey.",
+    "kind": "merch",
+    "price_cents": 9999,
+    "currency": "usd"
+  },
+  {
+    "id": "bla-tee",
+    "name": "Grey Jersey",
+    "category": "newcollection",
+    "price": 99.99,
+    "image": "/merch/g-shirt.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "tag": "NEW",
+    "description": "Morgan Wallen 16 Tennessee Volunteers Charcoal Grey Jersey, Stitched, All Sizes.",
+    "kind": "merch",
+    "price_cents": 9999,
+    "currency": "usd"
+  },
+  {
+    "id": "ball-tee",
+    "name": "Baseball Jersey",
+    "category": "newcollection",
+    "price": 199.99,
+    "image": "/merch/ball-shirt.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "tag": "NEW",
+    "description": "Morgan Wallen Still The Problem Tour Official Merch Baseball Jersey.",
+    "kind": "merch",
+    "price_cents": 19999,
+    "currency": "usd"
+  },
+  {
+    "id": "tee-graphic",
+    "name": "Still The Problem Tee",
+    "category": "tees",
+    "price": 49.99,
+    "image": "/merch/still-the-problem-tee.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "tag": "NEW",
+    "description": "Graphic tee inspired by the Still the Problem Tour. Vintage wash finish.",
+    "kind": "merch",
+    "price_cents": 4999,
+    "currency": "usd"
+  },
+  {
+    "id": "ns-graphic",
+    "name": "Noris Bear Morgan Wallen Shirt",
+    "category": "newcollection",
+    "price": 160.99,
+    "image": "/merch/noris-tee.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "tag": "NEW",
+    "description": "Norris Bear Morgan Wallen Shirt with 2026 Tour Bag.",
+    "kind": "merch",
+    "price_cents": 16099,
+    "currency": "usd"
+  },
+  {
+    "id": "hoodie-cream",
+    "name": "Reserve Hoodie (Cream)",
+    "category": "hoodies",
+    "price": 89.99,
+    "image": "/merch/reserve-hoodie-cream.jpg",
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "tag": "",
+    "description": "Same premium pullover hoodie in a warm cream colorway with gold detailing.",
+    "kind": "merch",
+    "price_cents": 8999,
+    "currency": "usd"
+  },
+  {
+    "id": "mw-hat",
+    "name": "Morgan Wallen x Field & Stream Camo Hat",
+    "category": "hats",
+    "price": 36.99,
+    "image": "/merch/mw-camo-hat.jpg",
+    "sizes": [
+      "One Size"
+    ],
+    "tag": "",
+    "description": "Camo trucker hat featuring an embroidered patch sewn onto the front.",
+    "kind": "merch",
+    "price_cents": 3699,
+    "currency": "usd"
+  },
+  {
+    "id": "membership-crew",
+    "name": "The Crew",
+    "kind": "membership",
+    "price_cents": 35000,
+    "currency": "usd",
+    "description": "One year of membership. Manual renewal; no recurring charge.",
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "image": null
+  },
+  {
+    "id": "membership-backroad",
+    "name": "The Backroad Circle",
+    "kind": "membership",
+    "price_cents": 65000,
+    "currency": "usd",
+    "description": "One year of membership. Manual renewal; no recurring charge.",
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "image": null
+  },
+  {
+    "id": "membership-frontrow",
+    "name": "The Front Row",
+    "kind": "membership",
+    "price_cents": 90000,
+    "currency": "usd",
+    "description": "One year of membership. Manual renewal; no recurring charge.",
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "image": null
+  }
+]

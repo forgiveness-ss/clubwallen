@@ -9,7 +9,8 @@ for(const entry of await readdir(path.join(root,'public'),{withFileTypes:true}))
 await mkdir(path.join(out,'assets'),{recursive:true});
 const css=await readFile(path.join(root,'src/base.css'),'utf8');
 const overrides=await readFile(path.join(root,'src/overrides.css'),'utf8');
-await writeFile(path.join(out,'assets/site.css'),css+'\n'+overrides);
+const adminCss=await readFile(path.join(root,'src/admin.css'),'utf8');
+await writeFile(path.join(out,'assets/site.css'),css+'\n'+overrides+'\n'+adminCss);
 const routes=JSON.parse(await readFile(path.join(root,'src/routes.json'),'utf8'));
 const staticPages={};for(const [route,config] of Object.entries(routes))if(config.html)staticPages[route]=await readFile(path.join(root,'src',config.html),'utf8');
 await build({entryPoints:[path.join(root,'src/app.jsx')],outfile:path.join(out,'assets/app.js'),bundle:true,format:'esm',minify:true,define:{'process.env.NODE_ENV':'"production"','globalThis.__RESERVE_STATIC_PAGES__':JSON.stringify(staticPages)},loader:{'.js':'jsx'},logLevel:'warning'});
@@ -17,7 +18,7 @@ const template=await readFile(path.join(root,'src/snapshots/index.html'),'utf8')
 const captureBody=html=>(html.match(/<header[\s\S]*?(?=<script)/)?.[0]||'').replace(/<header\b[\s\S]*?<\/header>/,header=>header.replaceAll('THE RESERVE','THE EXCLUSIVE'));
 const capturedBody=captureBody(template);
 const shell=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Club Wallen: The Reserve</title><meta name="description" content="Private Club Wallen reference rebuild for rebranding."><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/assets/site.css"><script type="module" src="/assets/app.js"></script></head><body><div id="root">${capturedBody}</div><noscript>This website needs JavaScript for carts, membership selection, and checkout.</noscript></body></html>`;
-const outputRoutes=[...new Set([...Object.keys(routes),'/dashboard','/portal','/checkout/crypto'])];
+const outputRoutes=[...new Set([...Object.keys(routes),'/dashboard','/portal','/checkout/crypto','/checkout/result','/admin'])];
 for(const route of outputRoutes){
  const destination=route==='/'?path.join(out,'index.html'):path.join(out,route.slice(1),'index.html');
  await mkdir(path.dirname(destination),{recursive:true});

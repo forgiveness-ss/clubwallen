@@ -1,5 +1,7 @@
 # Architecture and reference audit
 
+Implementation update: a persistent local backend and CRM have since been added. See [BACKEND.md](BACKEND.md) for the current implementation. This document preserves the reference audit and initial demo architecture; its demo-adapter descriptions apply to the retained reference flows.
+
 Reference: https://www.clubwallen.site/ · inspected November 13, 2026.
 
 This audit describes observable HTML and publicly served client JavaScript. The original repository, database contents, API implementation, fulfillment systems, admin area, merchant account settings, and real payment verification were not accessible or tested. Nothing here claims those private systems have been copied.

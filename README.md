@@ -1,34 +1,56 @@
-# Club Wallen — reference rebuild
+# Club Wallen — The Exclusive
 
-A faithful recreation of the publicly served Club Wallen site, captured on November 13, 2026. It preserves the reference's React page layouts, copy, animations, product catalog, photographs, video, festival experience, ticket selection, and checkout interfaces. The member dashboard UI was reconstructed from its publicly served component, using local demo data.
+The storefront now includes a local Node.js backend, persistent SQLite database, customer accounts, a protected CRM, and payment integration code. It runs on localhost without ChatGPT authentication. No live payment credentials are configured by default.
 
-## Run
+## Run locally
+
+Requires Node.js 24 or later; verified with Node.js 26.5.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:4173. After editing source, run `npm run build` and reload the browser. `PORT=3000 npm run dev` uses a different port.
+- Website: http://localhost:4173
+- CRM: http://localhost:4173/admin
+- Customer account: http://localhost:4173/dashboard
+
+On your first CRM visit, create your own administrator account. There is no default administrator password. Customer signup creates a separate customer account without administrator privileges.
+
+Records persist in `.data/exclusive.sqlite`. Private Cash App receipt images are stored in `.data/receipts/`. These files and `.env` are excluded from Git and the static website output. Back up the entire `.data/` directory before moving this installation.
+
+After frontend edits, run `npm run build` and refresh. Restart after backend or environment changes. The server binds only to loopback.
 
 ```sh
 npm run build
 npm run check
 ```
 
-`dist/` is the static deployment output. The build is self-contained and does not need the original website or the optional `reference/` research directory.
+## Payments: United States, USD, manual annual renewal
 
-## Demo behavior
+- **Cards:** Stripe hosted Checkout, server-calculated USD prices, signed webhooks.
+- **Crypto:** Stripe supported stablecoins such as USDC. Enable stablecoins in your Stripe account and then in CRM payment settings. Bitcoin is not implemented.
+- **Manual Cash App:** configure your own `$CashTag` in CRM settings. Receipts enter an awaiting-review queue. An administrator must independently verify the transfer and supply a transaction reference before approval.
+- **Memberships:** one-year purchases with manual renewal. No automatic recurring charge is created.
 
-- Login: `demo@example.com` / `ReserveDemo2026!`.
-- Product sizes, cart quantities, totals, membership selection, original promo rules, festival cart, hotel selection, ticket selection, FAQs, and menus use the captured client behavior.
-- Crypto and card checkout complete local demo orders. Cash App displays a placeholder handle. Bank transfer displays placeholder details.
-- Signup previews the original flow without creating an external account. Passwords are neither sent nor persisted.
-- Support submissions stay in this browser. No email or payment-proof file is sent.
-- Page banners identify these demo flows. No purchase, ticket issuance, membership fulfillment, email delivery, or actual payment verification takes place.
+Copy `.env.example` to `.env`, supply your Stripe test secret key and webhook signing secret, and restart. Never put secret keys in frontend code. For local webhook testing with the official Stripe CLI:
 
-## Rebrand and connect services
+```sh
+stripe listen --forward-to localhost:4173/api/webhooks/stripe
+```
 
-Edit `src/site.config.js` for the demo payment handle, support destination, and utility-page branding. Original page-specific copy and branding are intentionally preserved in `src/components/`; edit those named files and replace images under `public/`. Update `src/snapshots/` as well if you want the initial static HTML to reflect copy changes before JavaScript starts.
+Use that listener's signing secret as `STRIPE_WEBHOOK_SECRET`. The CRM displays configuration status and test/live mode. Test revenue is kept separate from live revenue.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the complete route map, payment inventory, storage, known reference defects, and remaining production backend work. Switching the demo flag alone does not provide a backend.
+See [docs/BACKEND.md](docs/BACKEND.md) for the API and verification rules.
+
+## Scope and remaining integrations
+
+Merchandise and membership checkout use the new backend. Customers, orders, payment status, membership activation, product prices, stock counts, support replies, and audit history are backed by SQLite. Newly registered customer accounts require administrator verification of email ownership before historical customer records are released.
+
+Original event, festival, hotel, foundation, and legacy payment screens remain labeled reference previews. Real ticket/hotel inventory, donation processing, a content editor, outbound email, automated email verification/password recovery, shipping services, and tax configuration are not implemented.
+
+The shop and membership-selection pages read prices from the backend. Homepage promotional plan descriptions/prices remain marketing copy in `src/components/Home.js`; update those when changing offers. Do not rerun `scripts/extract-components.mjs` over customized components; that research utility imports the original captured application.
+
+`dist/` contains only the frontend. Hosting that directory alone does not run the backend or CRM API. This work remains local as requested; the earlier private hosted preview has not been updated with the backend.
+
+[Original reference audit](docs/ARCHITECTURE.md)
