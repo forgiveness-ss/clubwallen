@@ -2,7 +2,8 @@ import React from "react";
 import { api, money } from "./backend-client.js";
 import { Link, navigate } from "./navigation.js";
 import {
-  ApplePay,
+  InstructionModal,
+  ManualInstructions,
   PaymentInstructions,
   paymentLabel,
   manualMethod,
@@ -22,6 +23,17 @@ const available = (status, method) =>
     wire: status.wireConfigured,
   })[method];
 export function StoreCheckout() {
+  const [preview, setPreview] = React.useState(null);
+  const closePreview = React.useCallback(() => setPreview(null), []);
+  async function showInstructions() {
+    try {
+      const data = await api("/api/payment-instructions/applepay");
+      setPreview(data.instructions);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   const query = new URLSearchParams(location.search),
     membership = query.get("type") === "membership";
   const selectedPlan =
@@ -205,8 +217,8 @@ export function StoreCheckout() {
               {[
                 [
                   "applepay",
-                  "Apple Pay",
-                  "Pay using Apple Wallet on a supported device.",
+                  status.applePayButtonLabel,
+                  status.applePayDescription,
                 ],
                 [
                   "btc",
@@ -237,6 +249,9 @@ export function StoreCheckout() {
                     checked={method === key}
                     disabled={!available(status, key)}
                     onChange={() => setMethod(key)}
+                    onClick={() => {
+                      if (key === "applepay") showInstructions();
+                    }}
                   />
                   <div>
                     <strong>{label}</strong>
@@ -252,10 +267,20 @@ export function StoreCheckout() {
                   One-year membership · manual yearly renewal.
                 </div>
               )}
-              {method === "applepay" && status.applePayMode === "test" && (
-                <div className="crm-alert">
-                  Apple Pay is in Stripe test mode.
-                </div>
+              {method === "applepay" && status.applePayConfigured && (
+                <>
+                  <p className="crm-muted">
+                    Instructions only · payment requires administrator
+                    verification.
+                  </p>
+                  <button
+                    type="button"
+                    className="crm-secondary"
+                    onClick={showInstructions}
+                  >
+                    View instructions
+                  </button>
+                </>
               )}
             </section>
           </div>
@@ -335,7 +360,10 @@ export function StoreCheckout() {
             >
               {busy
                 ? "Creating your order…"
-                : "Continue with " + paymentLabel(method)}
+                : "Continue with " +
+                  (method === "applepay"
+                    ? status.applePayButtonLabel
+                    : paymentLabel(method))}
             </button>
             <p className="crm-muted">
               Your membership is activated after payment is verified.
@@ -346,10 +374,15 @@ export function StoreCheckout() {
           </aside>
         </form>
       )}
+      {preview && <InstructionModal details={preview} onClose={closePreview} />}
     </div>
   );
 }
 export function OrderResult() {
+  const [preview, setPreview] = React.useState(null);
+  const shown = React.useRef(false);
+  const closePreview = React.useCallback(() => setPreview(null), []);
+
   const params = new URLSearchParams(location.search),
     query = new URLSearchParams({
       order: params.get("order") || "",
@@ -403,7 +436,22 @@ export function OrderResult() {
   const order = data?.order,
     crypto = order && ["btc", "usdt"].includes(order.method),
     review = order?.payment_status === "awaiting_review",
-    paid = order?.payment_status === "paid";
+    paid = order?.payment_status === "paid",
+    manualInstructions = order?.payment_details?.type === "manual_instructions",
+    needsReceipt =
+      order?.method === "applepay"
+        ? !!order.payment_details?.receiptRequired
+        : !crypto;
+  React.useEffect(() => {
+    if (
+      manualInstructions &&
+      order.payment_status === "unpaid" &&
+      !shown.current
+    ) {
+      shown.current = true;
+      setPreview(order.payment_details);
+    }
+  }, [manualInstructions, order]);
   return (
     <div className="utility-page">
       <div className="utility-card wide">
@@ -412,9 +460,11 @@ export function OrderResult() {
           {paid
             ? "Payment verified."
             : review
-              ? "Transfer under review."
-              : order?.method === "applepay"
-                ? "Complete Apple Pay."
+              ? manualInstructions
+                ? order.payment_details.reviewTitle
+                : "Transfer under review."
+              : manualInstructions
+                ? order.payment_details.title
                 : order?.status === "quote_requested"
                   ? "Your crypto quote is being prepared."
                   : "Complete your transfer."}
@@ -432,7 +482,9 @@ export function OrderResult() {
               {paid
                 ? "Your order is recorded. Membership purchases are available in your account."
                 : review
-                  ? "Your transfer details are saved. An administrator will verify the actual funds before marking your order paid."
+                  ? manualInstructions
+                    ? order.payment_details.reviewMessage
+                    : "Your transfer details are saved. An administrator will verify the actual funds before marking your order paid."
                   : "Keep this private order link to check your payment status."}
             </p>
             {order.payment_status === "rejected" && (
@@ -442,20 +494,35 @@ export function OrderResult() {
                 support.
               </div>
             )}
-            {order.method === "applepay" && !paid && (
-              <ApplePay order={order} query={query} />
+            {manualInstructions && !paid && (
+              <>
+                <ManualInstructions details={order.payment_details} />
+                <button
+                  type="button"
+                  className="crm-secondary"
+                  onClick={() => setPreview(order.payment_details)}
+                >
+                  View instructions
+                </button>
+              </>
+            )}
+            {order.method === "applepay" && !manualInstructions && !paid && (
+              <p>Contact support about this order’s earlier payment setup.</p>
             )}
             {["btc", "usdt", "wire"].includes(order.method) && !paid && (
               <PaymentInstructions order={order} onRefresh={load} />
             )}
             {manualMethod(order.method) &&
+              (order.method !== "applepay" || manualInstructions) &&
               ["unpaid", "rejected"].includes(order.payment_status) &&
               (!crypto || !!order.payment_details?.amount) && (
                 <form onSubmit={send}>
                   <label>
                     {crypto
                       ? "Blockchain transaction hash"
-                      : "Bank transfer reference"}
+                      : manualInstructions
+                        ? order.payment_details.referenceLabel
+                        : "Bank transfer reference"}
                     <input
                       required
                       value={reference}
@@ -464,11 +531,15 @@ export function OrderResult() {
                     />
                   </label>
                   <label>
-                    Receipt image · maximum 3 MB{crypto ? " · optional" : ""}
+                    {manualInstructions
+                      ? order.payment_details.receiptLabel
+                      : "Receipt image"}{" "}
+                    · maximum 3 MB
+                    {needsReceipt ? "" : " · optional"}
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
-                      required={!crypto}
+                      required={needsReceipt}
                       onChange={file}
                     />
                   </label>
@@ -481,9 +552,13 @@ export function OrderResult() {
                   )}
                   <button
                     className="gold-button"
-                    disabled={busy || (!crypto && !image)}
+                    disabled={busy || (needsReceipt && !image)}
                   >
-                    {busy ? "Submitting…" : "Submit transfer for verification"}
+                    {busy
+                      ? "Submitting…"
+                      : manualInstructions
+                        ? order.payment_details.submitLabel
+                        : "Submit transfer for verification"}
                   </button>
                 </form>
               )}
@@ -496,6 +571,7 @@ export function OrderResult() {
           </>
         )}
       </div>
+      {preview && <InstructionModal details={preview} onClose={closePreview} />}
     </div>
   );
 }

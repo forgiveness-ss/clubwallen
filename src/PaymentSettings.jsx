@@ -1,4 +1,5 @@
 import React from "react";
+import { ManualInstructions } from "./PaymentInstructions.jsx";
 export default function PaymentSettings({ data, busy, onSave }) {
   const [form, setForm] = React.useState(data.settings);
   React.useEffect(() => setForm(data.settings), [data]);
@@ -53,23 +54,69 @@ export default function PaymentSettings({ data, busy, onSave }) {
           {badge(p.applePayConfigured)}
         </div>
         <div className="crm-settings-body">
-          {toggle("applePayEnabled", "Offer Apple Pay at checkout")}
+          {toggle(
+            "applePayEnabled",
+            "Offer the editable instruction option at checkout",
+          )}
           <p>
-            Apple Pay uses Stripe and confirms payments automatically. Customers
-            need a supported device and Apple Wallet.
+            This option opens your own instruction panel. No Stripe account or
+            payment API is used. The customer-facing panel states that admin
+            verification is required.
           </p>
-          <div className="crm-alert">
-            One-time provider setup: configure STRIPE_SECRET_KEY,
-            STRIPE_PUBLISHABLE_KEY, and STRIPE_WEBHOOK_SECRET in Vercel,
-            register your website domain in Stripe, and redeploy. Secret keys
-            are not entered in this dashboard.
-          </div>
-          <p className="crm-muted">
-            Stripe mode: {p.applePayMode}. Webhook:{" "}
-            <code>/api/webhooks/stripe</code>. Include{" "}
-            <code>payment_intent.succeeded</code> and{" "}
-            <code>charge.refunded</code>.
+          {field("applePayButtonLabel", "Checkout option / button label")}
+          {field("applePayDescription", "Short checkout description")}
+          {field("applePayTitle", "Instruction heading")}
+          <label>
+            Instructions shown to customers
+            <textarea
+              rows={6}
+              maxLength={5000}
+              value={form.applePayInstructions || ""}
+              onChange={(e) =>
+                setForm({ ...form, applePayInstructions: e.target.value })
+              }
+            />
+          </label>
+          {field("applePayRecipientLabel", "Receiving details label")}
+          {field("applePayRecipient", "Receiving number or other details", {
+            autoComplete: "off",
+          })}
+          {field(
+            "applePayContinueLabel",
+            "Instruction panel continue button text",
+          )}
+          {field("applePayReferenceLabel", "Payment reference field label")}
+          {field("applePayReceiptLabel", "Receipt upload label")}
+          {field("applePaySubmitLabel", "Submit payment details button text")}
+          {field("applePayReviewTitle", "Heading after submission")}
+          {toggle(
+            "applePayReceiptRequired",
+            "Require a receipt image when the customer submits payment details",
+          )}
+          <label>
+            Message after submission
+            <textarea
+              rows={3}
+              maxLength={1500}
+              value={form.applePayReviewMessage || ""}
+              onChange={(e) =>
+                setForm({ ...form, applePayReviewMessage: e.target.value })
+              }
+            />
+          </label>
+          <p>
+            Use accurate instructions for the service receiving the payment.
+            Preview the panel below before saving. Updates apply to new orders;
+            existing orders retain the details already issued.
           </p>
+          <ManualInstructions
+            details={{
+              title: form.applePayTitle,
+              instructions: form.applePayInstructions,
+              recipientLabel: form.applePayRecipientLabel,
+              recipient: form.applePayRecipient,
+            }}
+          />
         </div>
       </section>
       <section className="crm-panel">

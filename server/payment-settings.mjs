@@ -4,6 +4,21 @@ import { getAddress } from "@ethersproject/address";
 
 export const PAYMENT_DEFAULTS = {
   applePayEnabled: "false",
+  applePayButtonLabel: "Apple Pay instructions",
+  applePayDescription:
+    "View the payment instructions supplied by the administrator.",
+  applePayTitle: "Payment instructions",
+  applePayInstructions: "",
+  applePayRecipientLabel: "Receiving details",
+  applePayRecipient: "",
+  applePayContinueLabel: "Continue with these instructions",
+  applePayReferenceLabel: "Payment reference",
+  applePayReceiptLabel: "Receipt image",
+  applePaySubmitLabel: "Submit payment details for review",
+  applePayReviewTitle: "Payment under review",
+  applePayReviewMessage:
+    "Your payment details have been submitted. An administrator will verify the payment before activating your order.",
+  applePayReceiptRequired: "true",
   btcEnabled: "false",
   btcAddress: "",
   usdtEnabled: "false",
@@ -57,18 +72,18 @@ export function wireReady(s) {
       /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(s.wireSwift))
   );
 }
-export function paymentReadiness(
-  s,
-  { stripeKey, stripeWebhook, stripePublishable },
-) {
-  const mode = /^(sk|rk)_live_/.test(stripeKey) ? "live" : "test";
+export function paymentReadiness(s) {
   return {
     applePayConfigured:
       isTrue(s.applePayEnabled) &&
-      !!stripeWebhook &&
-      /^(sk|rk)_(test|live)_/.test(stripeKey) &&
-      stripePublishable.startsWith("pk_" + mode + "_"),
-    applePayMode: mode,
+      !!s.applePayInstructions?.trim() &&
+      !!s.applePayButtonLabel?.trim() &&
+      !!s.applePayTitle?.trim(),
+    applePayMode: "manual",
+    applePayButtonLabel:
+      s.applePayButtonLabel || PAYMENT_DEFAULTS.applePayButtonLabel,
+    applePayDescription:
+      s.applePayDescription || PAYMENT_DEFAULTS.applePayDescription,
     btcConfigured:
       isTrue(s.btcEnabled) && validWallet("btc", s.btcAddress, "bitcoin"),
     usdtConfigured:
@@ -84,9 +99,25 @@ export function validatePaymentSettings(s) {
     "btcEnabled",
     "usdtEnabled",
     "wireEnabled",
+    "applePayReceiptRequired",
   ])
     if (!["true", "false"].includes(s[key]))
       throw Error("Choose a valid payment method status");
+  if (
+    isTrue(s.applePayEnabled) &&
+    (!s.applePayInstructions?.trim() ||
+      !s.applePayButtonLabel?.trim() ||
+      !s.applePayTitle?.trim() ||
+      !s.applePayContinueLabel?.trim() ||
+      !s.applePayReferenceLabel?.trim() ||
+      !s.applePayReceiptLabel?.trim() ||
+      !s.applePaySubmitLabel?.trim() ||
+      !s.applePayReviewTitle?.trim() ||
+      !s.applePayReviewMessage?.trim())
+  )
+    throw Error(
+      "Complete the customer-facing label, title, instructions, continue button, reference label, and review message before enabling this option",
+    );
   if (s.btcAddress && !validWallet("btc", s.btcAddress, "bitcoin"))
     throw Error("Enter a valid Bitcoin mainnet receiving address");
   if (s.usdtAddress && !validWallet("usdt", s.usdtAddress, s.usdtNetwork))
@@ -107,8 +138,24 @@ export function validatePaymentSettings(s) {
     );
 }
 export const isManual = (method) =>
-  ["btc", "usdt", "wire", "cashapp"].includes(method);
+  ["applepay", "btc", "usdt", "wire", "cashapp"].includes(method);
 export function receivingDetails(method, s) {
+  if (method === "applepay")
+    return {
+      type: "manual_instructions",
+      label: s.applePayButtonLabel,
+      title: s.applePayTitle,
+      instructions: s.applePayInstructions,
+      recipientLabel: s.applePayRecipientLabel,
+      recipient: s.applePayRecipient,
+      continueLabel: s.applePayContinueLabel,
+      referenceLabel: s.applePayReferenceLabel,
+      receiptLabel: s.applePayReceiptLabel,
+      submitLabel: s.applePaySubmitLabel,
+      reviewTitle: s.applePayReviewTitle,
+      reviewMessage: s.applePayReviewMessage,
+      receiptRequired: s.applePayReceiptRequired === "true",
+    };
   if (method === "wire")
     return {
       type: "wire",

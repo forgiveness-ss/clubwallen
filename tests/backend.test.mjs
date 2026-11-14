@@ -346,25 +346,14 @@ test("Wire receipts await review, server prices cannot be spoofed, membership gr
     await f.close();
   }
 });
-test("Apple Pay uses server-priced USD intents; only matching signed Apple Pay events activate membership", async () => {
-  let form,
-    wallet = "apple_pay",
-    oid;
+test("Historical Stripe orders still require matching signed Apple Pay wallet events", async () => {
+  let wallet = "apple_pay";
+  const oid = "historical-order";
   const f = await fixture({
     stripeKey: "sk_test_fixture",
     stripeWebhook: "whsec_fixture",
-    stripePublishable: "pk_test_fixture",
-    fetcher: async (url, options) => {
-      if (options.method === "POST") {
-        assert.equal(url, "https://api.stripe.com/v1/payment_intents");
-        form = options.body;
-        oid = form.get("metadata[order_id]");
-        return Response.json({
-          id: "pi_fixture",
-          client_secret: "pi_fixture_secret_test",
-        });
-      }
-      return Response.json({
+    fetcher: async () =>
+      Response.json({
         id: "pi_fixture",
         client_secret: "pi_fixture_secret_test",
         status: "succeeded",
@@ -376,36 +365,43 @@ test("Apple Pay uses server-priced USD intents; only matching signed Apple Pay e
         latest_charge: {
           payment_method_details: { card: { wallet: { type: wallet } } },
         },
-      });
-    },
+      }),
   });
   try {
     const owner = await admin(f.api);
-    await request(f.api, "/api/admin/settings", {
-      method: "PATCH",
-      cookie: owner,
-      data: { applePayEnabled: "true" },
-    });
-    for (const method of ["card", "crypto", "cashapp"])
-      assert.equal(
-        (
-          await request(f.api, "/api/orders", {
-            method: "POST",
-            data: { ...membership, method },
-          })
-        ).status,
-        400,
+    await f.api.db
+      .prepare(
+        "INSERT INTO customers(id,email,name,created_at) VALUES(?,?,?,?)",
+      )
+      .run(
+        "historical-customer",
+        "old@example.test",
+        "Historical Customer",
+        new Date().toISOString(),
       );
-    const checkout = await request(f.api, "/api/orders", {
-      method: "POST",
-      data: { ...membership, method: "applepay", amount: 1 },
-    });
-    assert.equal(checkout.status, 201, JSON.stringify(checkout.json));
-    assert.equal(form.get("amount"), "35000");
-    assert.equal(form.get("currency"), "usd");
-    assert.equal(form.get("payment_method_types[0]"), "card");
-    assert.equal(form.get("metadata[checkout_method]"), "applepay");
-    assert.equal(form.get("setup_future_usage"), null);
+    await f.api.db
+      .prepare(
+        "INSERT INTO orders(id,customer_id,method,amount_cents,items,access_token_hash,provider_id,provider_mode,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+      )
+      .run(
+        oid,
+        "historical-customer",
+        "applepay",
+        35000,
+        JSON.stringify([
+          {
+            productId: "membership-crew",
+            kind: "membership",
+            name: "Crew",
+            quantity: 1,
+            unitPrice: 35000,
+          },
+        ]),
+        "not-used-in-this-test",
+        "pi_fixture",
+        "test",
+        new Date().toISOString(),
+      );
     const event = {
       id: "evt_one",
       type: "payment_intent.succeeded",
@@ -789,6 +785,176 @@ test("BTC and USDT wallet transfers retain their network/address, wait for verif
         .payment_details.amount,
       "0.0051",
     );
+  } finally {
+    await f.close();
+  }
+});
+
+test("Editable instruction checkout needs no Stripe account, snapshots copy, and only an admin can confirm payment", async () => {
+  let providerCalls = 0;
+  const f = await fixture({
+    fetcher: async () => {
+      providerCalls++;
+      throw Error("No provider request should occur");
+    },
+  });
+  try {
+    const owner = await admin(f.api);
+    assert.equal(
+      (await request(f.api, "/api/payment-instructions/applepay")).status,
+      404,
+    );
+    assert.equal(
+      (
+        await request(f.api, "/api/admin/settings", {
+          method: "PATCH",
+          cookie: owner,
+          data: { applePayEnabled: "true" },
+        })
+      ).status,
+      400,
+    );
+    const copy = {
+      applePayEnabled: "true",
+      applePayButtonLabel: "Apple Pay instructions",
+      applePayTitle: "Read these payment instructions",
+      applePayInstructions:
+        "Step 1: Follow the receiving service instructions.\nStep 2: Include the order reference.",
+      applePayRecipientLabel: "Receiving contact",
+      applePayRecipient: "555-0100",
+      applePayContinueLabel: "Got it",
+      applePayReferenceLabel: "Transfer ID",
+      applePayReviewMessage: "We will verify your payment.",
+      applePayReceiptRequired: "false",
+    };
+    assert.equal(
+      (
+        await request(f.api, "/api/admin/settings", {
+          method: "PATCH",
+          cookie: owner,
+          data: copy,
+        })
+      ).status,
+      200,
+    );
+    const flags = (await request(f.api, "/api/status")).json;
+    assert.equal(flags.applePayConfigured, true);
+    assert.equal(flags.applePayMode, "manual");
+    assert.equal(
+      (await request(f.api, "/api/payment-instructions/applepay")).json
+        .instructions.instructions,
+      copy.applePayInstructions,
+    );
+    assert.equal(
+      (
+        await request(f.api, "/api/admin/settings", {
+          method: "PATCH",
+          data: { applePayInstructions: "attacker" },
+        })
+      ).status,
+      401,
+    );
+    const checkout = await request(f.api, "/api/orders", {
+      method: "POST",
+      data: {
+        ...membership,
+        method: "applepay",
+        amount: 1,
+        payment_status: "paid",
+      },
+    });
+    assert.equal(checkout.status, 201, JSON.stringify(checkout.json));
+    const query = new URL(checkout.json.url, origin).search;
+    const original = (await request(f.api, "/api/order" + query)).json.order;
+    assert.equal(original.amount_cents, 35000);
+    assert.equal(original.payment_status, "unpaid");
+    assert.equal(original.payment_details.type, "manual_instructions");
+    assert.equal(original.payment_details.recipient, "555-0100");
+    assert.equal(
+      (
+        await f.api.db
+          .prepare("SELECT provider_id FROM orders WHERE id=?")
+          .get(original.id)
+      ).provider_id,
+      null,
+    );
+    await request(f.api, "/api/admin/settings", {
+      method: "PATCH",
+      cookie: owner,
+      data: {
+        applePayInstructions: "Updated instructions",
+        applePayRecipient: "555-0101",
+        applePayReceiptRequired: "true",
+      },
+    });
+    assert.equal(
+      (await request(f.api, "/api/order" + query)).json.order.payment_details
+        .instructions,
+      copy.applePayInstructions,
+    );
+    assert.equal(
+      (await request(f.api, "/api/payment-instructions/applepay")).json
+        .instructions.recipient,
+      "555-0101",
+    );
+    assert.equal(
+      (
+        await request(f.api, "/api/order/proof" + query, {
+          method: "POST",
+          data: { reference: "manual-reference" },
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (await f.api.db.prepare("SELECT COUNT(*) AS n FROM memberships").get()).n,
+      0,
+    );
+    assert.equal(
+      (
+        await request(f.api, "/api/admin/orders", {
+          method: "PATCH",
+          cookie: owner,
+          data: {
+            id: original.id,
+            action: "verify_transfer",
+            reference: "manual-reference",
+          },
+        })
+      ).status,
+      409,
+    );
+    assert.equal(
+      (
+        await request(f.api, "/api/admin/orders", {
+          method: "PATCH",
+          cookie: owner,
+          data: {
+            id: original.id,
+            action: "verify_transfer",
+            reference: "manual-reference",
+            confirmed: true,
+          },
+        })
+      ).status,
+      200,
+    );
+    const next = await request(f.api, "/api/orders", {
+        method: "POST",
+        data: { ...membership, method: "applepay" },
+      }),
+      nextQuery = new URL(next.json.url, origin).search;
+    assert.equal(
+      (
+        await request(f.api, "/api/order/proof" + nextQuery, {
+          method: "POST",
+          data: { reference: "new-reference" },
+        })
+      ).status,
+      400,
+      "new orders honor updated receipt requirements",
+    );
+    assert.equal(providerCalls, 0);
   } finally {
     await f.close();
   }

@@ -42,11 +42,11 @@ The existing local database currently has no accounts, customers, orders, member
 | `SUPABASE_SECRET_KEY` | Server secret key; never prefixed with a frontend/public variable name |
 | `ADMIN_SETUP_TOKEN` | A privately generated random secret of at least 32 characters |
 | `ADMIN_EMAIL` | Your administrator email (recommended) |
-| `STRIPE_SECRET_KEY` | Your Stripe test secret key to begin |
-| `STRIPE_PUBLISHABLE_KEY` | Matching Stripe publishable key, e.g. `pk_test_…` |
-| `STRIPE_WEBHOOK_SECRET` | Signing secret for this deployment's Stripe webhook |
+| `STRIPE_SECRET_KEY` | Optional, only for legacy Stripe orders |
 
-The database/storage variables are required for the API. Payment keys can be omitted while setting up the CRM; Apple Pay stays unavailable until configured. Use separate Supabase projects and Stripe test credentials for preview/testing. Do not attach production secrets to untrusted preview branches.
+| `STRIPE_WEBHOOK_SECRET` | Optional, only for legacy Stripe callbacks |
+
+The database/storage variables are required for the API. New orders use manual instructions or wallet/wire transfers; no Stripe account or keys are required. Use separate Supabase projects for preview/testing. Do not attach production secrets to untrusted preview branches.
 
 4. Deploy or redeploy after environment changes. Deploying the complete repository includes both the website/CRM and `api/index.js`; Supabase remains a separate persistent service.
 5. Public visitors should use the **production domain**. Check Vercel Deployment Protection if the production website asks for a Vercel login. The CRM has its own administrator login at `/admin`; visitors do not need ChatGPT accounts.
@@ -59,15 +59,17 @@ If `/admin` cannot check setup, it shows a connection error and a retry button. 
 
 In CRM → Payment settings, configure the receiving Bitcoin address, USDT network/address, and wire beneficiary/bank/account instructions, then enable each completed method. These destinations are validated before saving and captured per order. Wallet transfers and wire receipts require independent administrator verification; a submission alone never marks an order paid. The same transfer reference cannot be approved for multiple orders. Memberships renew manually each year.
 
-## Connect Apple Pay and verify
+## Configure the editable instruction panel
 
-Set matching `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, and `STRIPE_WEBHOOK_SECRET` values in Vercel. In Stripe, register your production/custom domain under payment method domains for both test and live environments. Apple Pay requires HTTPS and a supported customer device/browser with Apple Wallet. Enable Apple Pay in CRM settings after configuring Stripe.
+In CRM → Payment settings, the former Apple Pay option is an instruction-only flow. Configure its checkout label and description, heading, instruction body, optional receiving number/details, continue button text, reference and receipt labels, submit button text, receipt requirement, and review heading/message. The preview shows how the instruction content will appear. Enable the completed option and save.
 
-Register `https://YOUR-DOMAIN/api/webhooks/stripe` in Stripe, selecting `payment_intent.succeeded` and `charge.refunded`. Retain `checkout.session.completed` and `checkout.session.async_payment_succeeded` only if you still need callbacks for historical orders. Save the endpoint signing secret in Vercel and redeploy. Ordinary card entry, Google Pay, Cash App, and Stripe stablecoin checkout are not offered for new orders.
+Clicking the option opens a compact modal. New orders capture a copy of the instructions. Returning customers see the original details from their order, even after the admin changes the CRM settings. Customers submit a payment reference and, when required, a private receipt; the order remains unpaid until an administrator verifies funds and explicitly approves it. This option does not initiate Apple Pay, Apple Cash, or card processing; instructions must accurately identify the actual receiving service. A fixed instructions-only/admin-verification notice remains visible.
+
+No Stripe account, provider keys, or domain registration is needed for new orders. The old Stripe endpoints remain solely to handle historical orders created under the previous integration.
 
 BTC and USDT are manual wallet transfers, not Stripe payments. The server requests a USD market quote from Kraken and calculates the exact asset amount with decimal arithmetic, rounded up to BTC's eight or USDT's six decimal places. Quotes expire in 15 minutes. If quotes are unavailable, the order enters `quote_requested`; the administrator can issue an exact amount from Orders & payments → Review. Customers must wait for a valid quote before transferring and submit the blockchain transaction hash. Approval requires checking the destination, network, amount, and confirmations in the receiving wallet. A wire approval requires a receipt and a verified bank reference.
 
-Check `/api/status`, create/sign into the owner account, save real receiving details, and verify the desired methods are enabled. Test Apple Pay on a supported device and confirm exactly one membership grant from a signed callback. Submit a test transfer for review, confirm it remains unpaid until verified, and confirm anonymous requests cannot view `/api/admin/receipt`. Then redeploy and confirm records and private receipt access persist. Live wallet, bank, and Apple Pay transactions have not been performed by the automated suite.
+Check `/api/status`, create/sign into the owner account, save real receiving details, and verify the desired methods are enabled. Preview the instruction modal, create a test order, and confirm the original text/receiving details remain attached after editing settings. Submit a test transfer for review, confirm it remains unpaid until verified, and confirm anonymous requests cannot view `/api/admin/receipt`. Then redeploy and confirm records and private receipt access persist. Live wallet, bank, and other external transfers have not been performed by the automated suite.
 
 The automated suite covers SQLite and an embedded PostgreSQL engine, raw signed callback bodies, account isolation, CRM queries, setup protection, receipt authorization, and durable rate counters. It does not establish that a live Supabase project, Vercel deployment, or merchant account is configured.
 

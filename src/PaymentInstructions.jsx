@@ -1,11 +1,9 @@
 import React from "react";
-import { loadStripe } from "@stripe/stripe-js/pure";
 import { api, money } from "./backend-client.js";
-import { navigate } from "./navigation.js";
 
 export const paymentLabel = (method) =>
   ({
-    applepay: "Apple Pay",
+    applepay: "Manual payment instructions",
     btc: "Bitcoin (BTC)",
     usdt: "Tether (USDT)",
     wire: "Wire transfer",
@@ -14,7 +12,7 @@ export const paymentLabel = (method) =>
     crypto: "Stablecoin (existing order)",
   })[method] || method;
 export const manualMethod = (method) =>
-  ["btc", "usdt", "wire", "cashapp"].includes(method);
+  ["applepay", "btc", "usdt", "wire", "cashapp"].includes(method);
 export function PaymentInstructions({ order, onRefresh }) {
   const details = order.payment_details || {},
     crypto = ["btc", "usdt"].includes(order.method),
@@ -154,97 +152,91 @@ export function PaymentInstructions({ order, onRefresh }) {
     </section>
   );
 }
-export function ApplePay({ order, query }) {
-  const mount = React.useRef(null),
-    [message, setMessage] = React.useState("Checking Apple Pay availability…"),
-    [error, setError] = React.useState("");
-  React.useEffect(() => {
-    let active = true,
-      element;
-    (async () => {
-      const payment = await api("/api/order/applepay?" + query);
-      const stripe = await loadStripe(payment.publishableKey);
-      if (!active) return;
-      if (!stripe) throw Error("Apple Pay could not load. Please retry.");
-      const elements = stripe.elements({
-        clientSecret: payment.clientSecret,
-        appearance: { theme: "night", variables: { colorPrimary: "#c8aa50" } },
-      });
-      element = elements.create("expressCheckout", {
-        buttonHeight: 50,
-        buttonType: { applePay: "buy" },
-        paymentMethods: {
-          applePay: "always",
-          googlePay: "never",
-          link: "never",
-          paypal: "never",
-          amazonPay: "never",
-          klarna: "never",
-        },
-        layout: { maxColumns: 1, maxRows: 1 },
-      });
-      element.on("ready", ({ availablePaymentMethods }) => {
-        if (active)
-          setMessage(
-            availablePaymentMethods?.applePay
-              ? "Confirm your payment using Apple Pay."
-              : "Apple Pay isn’t available on this device or browser. Use a supported device with Apple Wallet set up, or return to checkout and choose BTC, USDT, or wire transfer.",
-          );
-      });
-      element.on("loaderror", () => {
-        if (active)
-          setError(
-            "Apple Pay could not load. Check your connection or choose another payment method.",
-          );
-      });
-      element.on("confirm", async (event) => {
-        if (event.expressPaymentType !== "apple_pay") {
-          event.paymentFailed({ reason: "fail" });
-          return;
-        }
-        setError("");
-        try {
-          const submit = await elements.submit();
-          if (submit.error) throw Error(submit.error.message);
-          const result = await stripe.confirmPayment({
-            elements,
-            clientSecret: payment.clientSecret,
-            confirmParams: { return_url: payment.returnUrl },
-            redirect: "if_required",
-          });
-          if (result.error) throw Error(result.error.message);
-          if (active) navigate("/checkout/result?" + query);
-        } catch (e) {
-          if (active) setError(e.message);
-          event.paymentFailed({ reason: "fail" });
-        }
-      });
-      element.mount(mount.current);
-    })().catch((e) => {
-      if (active) setError(e.message);
-    });
-    return () => {
-      active = false;
-      element?.destroy();
-    };
-  }, [query]);
+export function ManualInstructions({ details }) {
+  const [copied, setCopied] = React.useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(details.recipient);
+      setCopied(true);
+    } catch {}
+  }
   return (
     <section className="payment-instructions">
-      <h2>Pay with Apple Pay</h2>
-      <p>{message}</p>
-      <div ref={mount} />
-      {error && (
-        <p className="crm-error" role="alert">
-          {error}
-        </p>
-      )}
-      <p className="crm-muted">
-        {money(order.amount_cents)} USD · Payment is confirmed by Stripe before
-        your order is activated.
+      <p className="crm-eyebrow">
+        INSTRUCTIONS ONLY · ADMIN VERIFICATION REQUIRED
       </p>
-      <a href="/checkout" className="text-link">
-        Choose another payment method →
-      </a>
+      <h2>{details.title}</h2>
+      <div className="manual-payment-copy">{details.instructions}</div>
+      {details.recipient && (
+        <dl className="payment-detail-list">
+          <div>
+            <dt>{details.recipientLabel || "Receiving details"}</dt>
+            <dd>
+              <span>{details.recipient}</span>
+              <button type="button" className="crm-row-action" onClick={copy}>
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </dd>
+          </div>
+        </dl>
+      )}
     </section>
+  );
+}
+export function InstructionModal({ details, onClose }) {
+  const closeButton = React.useRef(null),
+    previousFocus = React.useRef(null);
+  React.useEffect(() => {
+    previousFocus.current = document.activeElement;
+    closeButton.current?.focus();
+    const key = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "Tab") {
+        const nodes = [
+          ...document.querySelectorAll(".manual-instruction-dialog button"),
+        ];
+        const first = nodes[0],
+          last = nodes.at(-1);
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("keydown", key);
+      previousFocus.current?.focus();
+    };
+  }, [onClose]);
+  return (
+    <div className="crm-overlay" onClick={onClose}>
+      <section
+        className="crm-modal manual-instruction-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manual-instruction-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="crm-modal-title">
+          <h2 id="manual-instruction-title">{details.title}</h2>
+          <button
+            ref={closeButton}
+            type="button"
+            aria-label="Close instructions"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <ManualInstructions details={details} />
+        <button type="button" className="crm-primary" onClick={onClose}>
+          {details.continueLabel || "Continue"}
+        </button>
+      </section>
+    </div>
   );
 }

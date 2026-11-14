@@ -438,7 +438,10 @@ test("PostgreSQL webhook verification preserves raw bytes, rolls back stock conf
     await f.call("/api/admin/settings", {
       method: "PATCH",
       cookie: owner.cookie,
-      data: { applePayEnabled: "true" },
+      data: {
+        applePayEnabled: "true",
+        applePayInstructions: "Fixture instructions for a manual transfer.",
+      },
     });
     const input = {
       name: "Customer",
@@ -451,6 +454,13 @@ test("PostgreSQL webhook verification preserves raw bytes, rolls back stock conf
       data: input,
     });
     assert.equal(checkout.status, 201);
+    // Model an already-existing Stripe order from before manual instructions replaced checkout.
+    f.options.lastOrderId = checkout.json.orderId;
+    await f.db
+      .prepare(
+        "UPDATE orders SET provider_id='pi_fixture_1',provider_mode='test',payment_details='{}' WHERE id=?",
+      )
+      .run(checkout.json.orderId);
     const event = {
       id: "evt_raw",
       type: "payment_intent.succeeded",

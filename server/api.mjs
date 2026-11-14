@@ -164,7 +164,7 @@ export async function createApi({
       country: "US",
       currency: "USD",
       renewal: "manual",
-      ...paymentReadiness(s, { stripeKey, stripeWebhook, stripePublishable }),
+      ...paymentReadiness(s),
       supportEmail: s.supportEmail,
       emailConfigured: false,
     };
@@ -349,6 +349,14 @@ export async function createApi({
               .all()
           ).map(publicProduct),
         });
+      if (route === "/api/payment-instructions/applepay" && method === "GET") {
+        const cfg = await config();
+        if (!cfg.applePayConfigured)
+          fail(404, "These payment instructions are not available");
+        return reply(res, {
+          instructions: receivingDetails("applepay", await settings(db)),
+        });
+      }
       if (route === "/api/admin/setup" && method === "POST") {
         await limited(req, "setup", 5);
         if (cloud) {
@@ -625,10 +633,7 @@ export async function createApi({
             input.email.toLowerCase().trim(),
             text(input.name),
           );
-        const details =
-          input.method === "applepay"
-            ? {}
-            : receivingDetails(input.method, await settings(db));
+        const details = receivingDetails(input.method, await settings(db));
         if (["btc", "usdt"].includes(input.method)) {
           try {
             Object.assign(
@@ -651,43 +656,18 @@ export async function createApi({
             JSON.stringify(items),
             JSON.stringify(address),
             hash(token),
-            input.method === "applepay" ? cfg.applePayMode : "live",
+            "live",
             now(),
             JSON.stringify(details),
           );
-        const order = {
-          id: oid,
-          email: client.email,
-          items,
-          shippingCents: shipping,
-          amount_cents: subtotal + shipping,
-          method: input.method,
-        };
         const resultUrl = `/checkout/result?order=${oid}&token=${token}`;
-        if (input.method !== "applepay") {
-          if (details.quoteRequested)
-            await db
-              .prepare("UPDATE orders SET status='quote_requested' WHERE id=?")
-              .run(oid);
-          return reply(res, { orderId: oid, url: resultUrl }, 201);
-        }
-        try {
-          const payment = await applePayIntent(order, env, fetcher);
-          if (!payment.id.startsWith("pi_") || !payment.client_secret)
-            throw Error("Stripe did not return an Apple Pay payment.");
+        if (details.quoteRequested)
           await db
-            .prepare("UPDATE orders SET provider_id=? WHERE id=?")
-            .run(payment.id, oid);
-          return reply(res, { orderId: oid, url: resultUrl }, 201);
-        } catch (error) {
-          await db
-            .prepare(
-              "UPDATE orders SET status='payment_setup_failed' WHERE id=?",
-            )
+            .prepare("UPDATE orders SET status='quote_requested' WHERE id=?")
             .run(oid);
-          fail(502, error.message);
-        }
+        return reply(res, { orderId: oid, url: resultUrl }, 201);
       }
+
       if (route === "/api/order" && method === "GET") {
         const order = await orderAccess(req, url);
         const publicOrder = {
@@ -763,6 +743,9 @@ export async function createApi({
         const order = await orderAccess(req, url);
         if (
           !isManual(order.method) ||
+          (order.method === "applepay" &&
+            JSON.parse(order.payment_details || "{}").type !==
+              "manual_instructions") ||
           !["unpaid", "rejected"].includes(order.payment_status)
         )
           fail(409, "This order does not accept a receipt");
@@ -788,7 +771,11 @@ export async function createApi({
           );
         if (input.image && !match)
           fail(400, "Upload a PNG, JPEG, or WebP receipt");
-        if (order.method !== "btc" && order.method !== "usdt" && !match)
+        const needsReceipt =
+          ["wire", "cashapp"].includes(order.method) ||
+          (order.method === "applepay" &&
+            JSON.parse(order.payment_details || "{}").receiptRequired);
+        if (needsReceipt && !match)
           fail(400, "Upload a receipt image for this transfer");
         let receipt = null;
         if (match) {
@@ -989,8 +976,14 @@ export async function createApi({
               );
             if (
               !isManual(order.method) ||
+              (order.method === "applepay" &&
+                JSON.parse(order.payment_details || "{}").type !==
+                  "manual_instructions") ||
               order.payment_status !== "awaiting_review" ||
-              ((order.method === "wire" || order.method === "cashapp") &&
+              ((order.method === "wire" ||
+                order.method === "cashapp" ||
+                (order.method === "applepay" &&
+                  JSON.parse(order.payment_details || "{}").receiptRequired)) &&
                 !order.receipt) ||
               !text(input.reference) ||
               (input.action === "verify_transfer" && input.confirmed !== true)
@@ -1041,6 +1034,9 @@ export async function createApi({
           ) {
             if (
               !isManual(order.method) ||
+              (order.method === "applepay" &&
+                JSON.parse(order.payment_details || "{}").type !==
+                  "manual_instructions") ||
               order.payment_status !== "awaiting_review"
             )
               fail(409, "Order is not awaiting review");
@@ -1186,7 +1182,13 @@ export async function createApi({
             if (typeof input[key] === "string")
               changes[key] = text(
                 input[key],
-                key === "wireInstructions" ? 2000 : 500,
+                key === "applePayInstructions"
+                  ? 5000
+                  : key === "applePayReviewMessage"
+                    ? 1500
+                    : key === "wireInstructions"
+                      ? 2000
+                      : 500,
               );
           try {
             validatePaymentSettings({ ...current, ...changes });
