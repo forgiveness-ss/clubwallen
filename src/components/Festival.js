@@ -1048,9 +1048,9 @@ export default (e) => {
             children: [
               "Questions? ",
               (0, t.jsx)("a", {
-                href: "mailto:support@clubwallen.site",
+                href: "mailto:Support@clubwallen.fans",
                 style: { color: d.T.pink },
-                children: "support@clubwallen.site",
+                children: "Support@clubwallen.fans",
               }),
             ],
           }),
