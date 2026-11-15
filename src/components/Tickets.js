@@ -2636,7 +2636,13 @@ export default (e) => {
                               }),
                             ],
                           }),
-                        3 === ee &&
+                        3 === ee && (0, t.jsxs)("div", {
+                          children: [
+                            (0, t.jsx)("p", { children: "Ticket checkout is currently unavailable. Please contact support for assistance." }),
+                            (0, t.jsx)("a", { href: "/support", children: "Contact support" }),
+                          ],
+                        }),
+                        false &&
                           (0, t.jsxs)("div", {
                             children: [
                               (0, t.jsxs)("div", {

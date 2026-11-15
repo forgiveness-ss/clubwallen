@@ -1675,7 +1675,7 @@ export default (e) => {
                         [
                           "Select your show date and venue",
                           "Choose your section and quantity",
-                          "Pay securely via Bitcoin or Cash App",
+                          "Ticket checkout is currently unavailable",
                           "Tickets delivered directly to your email",
                         ].map((e, i) =>
                           (0, t.jsxs)(
@@ -1862,7 +1862,7 @@ export default (e) => {
                           "Choose from GA, Party Pit, VIP, Super VIP or Livin’ The Dream",
                           "Add a 4-night hotel package for 2 to 10 guests",
                           "Keep everything in one cart and apply your promo code",
-                          "Pay with crypto or Cash App",
+                          "Festival checkout is currently unavailable",
                         ].map((e, i) =>
                           (0, t.jsxs)(
                             "div",
