@@ -25,6 +25,7 @@ function CookieChoices({onClose}){
   return <div className="cookie-overlay" onClick={onClose}><section role="dialog" aria-modal="true" aria-labelledby="cookie-heading" className="cookie-dialog" onClick={e=>e.stopPropagation()}><h2 id="cookie-heading">Cookie Choices</h2><p>This preview uses browser storage for your cart and demo preferences. Essential storage keeps those features working.</p><button className="gold-button" autoFocus onClick={()=>{localStorage.setItem('reserve_cookie_choices','essential');onClose();}}>Essential only</button><button className="text-link" onClick={()=>{localStorage.setItem('reserve_cookie_choices','all');onClose();}}>Accept all</button><button className="text-link" onClick={onClose}>Close</button></section></div>;
 }
 function NotFound(){return <div className="utility-page"><div className="utility-card"><p className="eyebrow">404</p><h1>Let's get you back.</h1><Link className="gold-button" href="/">Return Home</Link></div></div>;}
+function FestivalCheckoutUnavailable(){return <div className="utility-page"><div className="utility-card"><p className="eyebrow">SAND IN MY BOOTS</p><h1>Checkout is currently unavailable.</h1><p>Festival tickets and hotel packages cannot be ordered here at this time. Please contact support for assistance.</p><Link href="/support" className="gold-button">Contact support</Link><Link href="/sand-in-my-boots" className="text-link">Back to festival</Link></div></div>;}
 class ErrorBoundary extends React.Component{
   state={error:null};static getDerivedStateFromError(error){return {error};}
   componentDidCatch(error){console.error('Page error:',error);}
@@ -56,6 +57,7 @@ function App(){
   },[path]);
   let Page;
   if(path==='/admin'||path.startsWith('/admin/'))Page=Admin;
+  else if(path==='/sand-in-my-boots/checkout'&&siteConfig.mode==='local')Page=FestivalCheckoutUnavailable;
   else if(siteConfig.mode==='local'&&path==='/checkout')Page=StoreCheckout;
   else if(siteConfig.mode==='local'&&path==='/checkout/result')Page=OrderResult;
   else if(siteConfig.mode==='local'&&path==='/login')Page=CustomerAuth;
