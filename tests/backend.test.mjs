@@ -1,12 +1,35 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Readable } from "node:stream";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createHmac } from "node:crypto";
 import { createApi } from "../server/api.mjs";
 import { cryptoAmount } from "../server/crypto-quotes.mjs";
+import { ticketDiscount } from "../server/ticket-discounts.mjs";
+import { festivalProduct } from "../server/festival-catalog.mjs";
+test("Ticket pricing source matches the customer listing generator", async () => {
+  const ui = await readFile(new URL("../src/components/Tickets.js", import.meta.url), "utf8");
+  const server = await readFile(new URL("../server/ticket-catalog.mjs", import.meta.url), "utf8");
+  const data = ui.slice(ui.indexOf("  let o ="), ui.indexOf("\n  e.s([", ui.indexOf("    A = {};")));
+  const start = ui.indexOf("(function (e) {", ui.indexOf("        eA ="));
+  const generator = ui.slice(start, ui.indexOf("})(R)", start) + 2);
+  assert.ok(server.startsWith(data + "\nconst generate = " + generator + ";"), "Update the server listing catalog whenever the customer listings change");
+});
+test("Festival prices come from the shared hard-coded catalog", () => {
+  assert.equal(festivalProduct("pass-ga-4pack").price_cents, 270748);
+  assert.equal(festivalProduct("hotel-ga-phoenix-east-2").price_cents, 486674);
+  assert.equal(festivalProduct("hotel-ga-phoenix-east-100"), null);
+  assert.equal(festivalProduct("pass-invalid-single"), null);
+});
+test("Ticket promotions apply only to eligible server-priced items", () => {
+  const items = [{ kind: "festival", unitPrice: 10001, quantity: 1 }, { kind: "ticket", unitPrice: 5000, quantity: 2 }, { kind: "merch", unitPrice: 3000, quantity: 1 }];
+  assert.deepEqual(ticketDiscount(items, " mowa1 "), { code: "MOWA1", amount: 5001 });
+  assert.equal(ticketDiscount(items, "MOWA101").amount, 3000);
+  assert.throws(() => ticketDiscount([{ kind: "merch", unitPrice: 3000, quantity: 1 }], "MOWA1"));
+  assert.throws(() => ticketDiscount(items, "other"));
+});
 const WIRE_SETTINGS = {
   wireEnabled: "true",
   wireBeneficiary: "Fixture Owner",
@@ -116,6 +139,39 @@ async function createWireOrder(api, owner) {
   assert.equal(created.status, 201, JSON.stringify(created.json));
   return new URL(created.json.url, origin);
 }
+test("Ticket order discount is calculated from catalog prices", async () => {
+  const f = await fixture();
+  try {
+    const owner = await admin(f.api);
+    await request(f.api, "/api/admin/settings", { method: "PATCH", cookie: owner, data: WIRE_SETTINGS });
+    await f.api.db.prepare("INSERT INTO products(id,name,kind,price_cents,active,sizes) VALUES(?,?,?,?,?,?)").run("ticket-test", "Test ticket", "ticket", 10001, 1, "[]");
+    const result = await request(f.api, "/api/orders", {method: "POST", data: {name: "Test buyer", email: "buyer@example.com", method: "wire", promoCode: "MOWA101", items: [{productId: "ticket-test", quantity: 2, unitPrice: 1}]}});
+    assert.equal(result.status, 201, JSON.stringify(result.json));
+    const order = (await request(f.api, "/api/order" + new URL(result.json.url, origin).search)).json.order;
+    assert.equal(order.amount_cents, 14001);
+    assert.equal(order.payment_details.discount.amount, 6001);
+  } finally { await f.close(); }
+});
+test("Festival and ticket listing orders use hard-coded prices and appear in CRM", async () => {
+  const f = await fixture();
+  try {
+    const owner = await admin(f.api);
+    await request(f.api, "/api/admin/settings", { method: "PATCH", cookie: owner, data: WIRE_SETTINGS });
+    for (const example of [
+      {id:"pass-ga-single", quantity:1, promoCode:"MOWA1", total:33843},
+      {id:"arl-0814-1", quantity:2, promoCode:"MOWA101", total:49560},
+    ]) {
+      const product = await request(f.api, "/api/listing-products?id=" + example.id);
+      assert.equal(product.status, 200);
+      const created = await request(f.api, "/api/orders", {method:"POST", data:{name:"Buyer", email:"buyer@example.com", method:"wire", promoCode:example.promoCode, address:{line1:"1 Main St",city:"Austin",state:"TX",zip:"78701",country:"US"}, items:[{productId:example.id,quantity:example.quantity,unitPrice:1}]}});
+      assert.equal(created.status, 201, JSON.stringify(created.json));
+      const order = (await request(f.api, "/api/order" + new URL(created.json.url, origin).search)).json.order;
+      assert.equal(order.amount_cents, example.total);
+      const orders = await request(f.api, "/api/admin/orders", {cookie:owner});
+      assert.ok(orders.json.rows.some(row => row.id === created.json.orderId));
+    }
+  } finally { await f.close(); }
+});
 const receipt =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aFioAAAAASUVORK5CYII=";
 test("Admin setup, protected records, CSRF, session expiry, and customer roles", async () => {

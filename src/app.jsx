@@ -12,6 +12,7 @@ const Header=loadComponent(70119).default;
 const legalContent=globalThis.__RESERVE_STATIC_PAGES__||{};
 function Notice({path}){
   if(path==='/support')return null;
+  if(path==='/sand-in-my-boots/checkout'&&siteConfig.mode==='local')return null;
   if(siteConfig.mode==='local'&&['/checkout','/checkout/result','/login','/signup','/dashboard','/portal'].includes(path))return null;
   if(!/^\/(login|signup|checkout|confirmation|support|donate|dashboard|portal)/.test(path)&&!path.endsWith('/checkout'))return null;
   return <aside className="demo-notice" role="note">{siteConfig.mode==='local'?path==='/support'?'Messages are saved to the support inbox. Replies are available in your customer account; email delivery is not configured.':'Reference preview: event, hotel, donation, and legacy checkout screens are not connected to live inventory or payments.':'Private rebuild · Demo mode. No payments are collected or messages emailed.'}{siteConfig.mode==='demo'&&path==='/login'&&<span> Sign in: <strong>demo@example.com</strong> / <strong>ReserveDemo2026!</strong></span>}</aside>;
@@ -57,7 +58,7 @@ function App(){
   },[path]);
   let Page;
   if(path==='/admin'||path.startsWith('/admin/'))Page=Admin;
-  else if(path==='/sand-in-my-boots/checkout'&&siteConfig.mode==='local')Page=FestivalCheckoutUnavailable;
+  else if(path==='/sand-in-my-boots/checkout'&&siteConfig.mode==='local')Page=()=> <StoreCheckout festival/>;
   else if(siteConfig.mode==='local'&&path==='/checkout')Page=StoreCheckout;
   else if(siteConfig.mode==='local'&&path==='/checkout/result')Page=OrderResult;
   else if(siteConfig.mode==='local'&&path==='/login')Page=CustomerAuth;

@@ -22,7 +22,7 @@ const available = (status, method) =>
     usdt: status.usdtConfigured,
     wire: status.wireConfigured,
   })[method];
-export function StoreCheckout() {
+export function StoreCheckout({festival = false}) {
   const [network, setNetwork] = React.useState("");
   const [preview, setPreview] = React.useState(null);
   const closePreview = React.useCallback(() => setPreview(null), []);
@@ -36,7 +36,15 @@ export function StoreCheckout() {
   }
 
   const query = new URLSearchParams(location.search),
-    membership = query.get("type") === "membership";
+    membership = query.get("type") === "membership",
+    ticket = query.get("type") === "ticket";
+  const request = React.useMemo(() => {
+    try { return JSON.parse(sessionStorage.getItem("cw_ticket_request") || "{}"); } catch { return {}; }
+  }, []);
+  const festivalCart = React.useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("sib-cart-v1") || "{}"); } catch { return {}; }
+  }, []);
+  const [promoCode, setPromoCode] = React.useState(ticket ? request.promo || "" : festival ? festivalCart.promo || "" : "");
   const selectedPlan =
     query.get("productId") ||
     "membership-" +
@@ -46,7 +54,7 @@ export function StoreCheckout() {
           ? "backroad"
           : "crew");
   const [items, setItems] = React.useState(() =>
-      membership
+      ticket ? (request.id ? [{productId: request.id, quantity: request.quantity, size: ""}] : []) : festival ? (festivalCart.items || []).map(i => ({productId: i.id, quantity: i.qty, size: ""})) : membership
         ? [
             {
               productId: selectedPlan,
@@ -63,8 +71,8 @@ export function StoreCheckout() {
     [catalog, setCatalog] = React.useState([]),
     [status, setStatus] = React.useState(null),
     [form, setForm] = React.useState({
-      name: "",
-      email: "",
+      name: ticket ? request.name || "" : "",
+      email: ticket ? request.email || "" : "",
       address: {
         line1: "",
         city: "",
@@ -77,7 +85,9 @@ export function StoreCheckout() {
     [error, setError] = React.useState(""),
     [busy, setBusy] = React.useState(false);
   React.useEffect(() => {
-    Promise.all([api("/api/catalog"), api("/api/status")])
+    const listingQuery = new URLSearchParams();
+    items.forEach(item => listingQuery.append("id", item.productId));
+    Promise.all([(ticket || festival) && !items.length ? Promise.resolve({products: []}) : api(ticket || festival ? "/api/listing-products?" + listingQuery : "/api/catalog"), api("/api/status")])
       .then(([data, status]) => {
         setCatalog(data.products);
         setStatus(status);
@@ -99,7 +109,8 @@ export function StoreCheckout() {
       0,
     ),
     hasMerch = rows.some((i) => i.product?.kind === "merch"),
-    shipping = hasMerch && subtotal <= 10000 ? 999 : 0;
+    shipping = hasMerch && subtotal <= 10000 ? 999 : 0,
+    discount = promoCode.trim().toUpperCase() === (ticket ? "MOWA101" : festival ? "MOWA1" : "") && (ticket || festival) ? Math.round(subtotal * (ticket ? .3 : .5)) : 0;
   function update(next) {
     setItems(next);
     if (!membership) {
@@ -124,8 +135,10 @@ export function StoreCheckout() {
     try {
       const data = await api("/api/orders", {
         method: "POST",
-        body: { ...form, method, items, network },
+        body: { ...form, method, items, network, promoCode },
       });
+      if (ticket) sessionStorage.removeItem("cw_ticket_request");
+      if (festival) localStorage.removeItem("sib-cart-v1");
       navigate(data.url);
     } catch (e) {
       setError(e.message);
@@ -187,7 +200,7 @@ export function StoreCheckout() {
                 history.
               </p>
             </section>
-            {hasMerch && (
+            {(hasMerch || festival) && (
               <section className="commerce-card">
                 <h2>Shipping address</h2>
                 {[
@@ -308,12 +321,13 @@ export function StoreCheckout() {
           </div>
           <aside className="commerce-card commerce-summary">
             <h2>Order summary</h2>
+            {(ticket || festival) && <p className="crm-alert">This is a fulfillment request. The seller will source and deliver the tickets or package; if unable to fulfill, a refund will be arranged.</p>}
             {rows.map((i, index) => (
               <div className="commerce-line" key={index}>
                 <div>
                   <strong>{i.product?.name || "Unavailable item"}</strong>
                   <small>Size {i.size || "Standard"}</small>
-                  {!membership && (
+                  {!membership && !ticket && !festival && (
                     <div className="commerce-quantity">
                       <button
                         type="button"
@@ -358,6 +372,7 @@ export function StoreCheckout() {
               </div>
             ))}
             <div className="commerce-totals">
+              {(ticket || festival) && <label>Promo code<input value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} /></label>}
               <p>
                 <span>Subtotal</span>
                 <strong>{money(subtotal)}</strong>
@@ -366,9 +381,10 @@ export function StoreCheckout() {
                 <span>Shipping</span>
                 <strong>{shipping ? money(shipping) : "Included"}</strong>
               </p>
+              {discount > 0 && <p><span>Discount</span><strong>−{money(discount)}</strong></p>}
               <p className="commerce-total">
                 <span>Total USD</span>
-                <strong>{money(subtotal + shipping)}</strong>
+                <strong>{money(subtotal + shipping - discount)}</strong>
               </p>
             </div>
             {error && <p className="crm-error">{error}</p>}
@@ -388,7 +404,7 @@ export function StoreCheckout() {
                     : paymentLabel(method))}
             </button>
             <p className="crm-muted">
-              Your membership is activated after payment is verified.
+              {ticket || festival ? "Payment and fulfillment require administrator review." : "Your membership is activated after payment is verified."}
             </p>
             <Link className="text-link" href="/shop">
               Continue shopping →

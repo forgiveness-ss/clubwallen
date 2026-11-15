@@ -5,6 +5,9 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { receiptStore, RECEIPT_LIMIT } from "./receipts.mjs";
+import { ticketDiscount } from "./ticket-discounts.mjs";
+import { festivalProduct } from "./festival-catalog.mjs";
+import { ticketProduct } from "./ticket-catalog.mjs";
 import path from "node:path";
 import {
   openDatabase,
@@ -349,6 +352,14 @@ export async function createApi({
               .all()
           ).map(publicProduct),
         });
+      if (route === "/api/listing-products" && method === "GET") {
+        await limited(req, "listing-catalog", 100);
+        const ids = url.searchParams.getAll("id");
+        if (!ids.length || ids.length > 30 || ids.some(id => id.length > 100)) fail(400, "Choose up to 30 listings");
+        const products = ids.map(id => festivalProduct(id) || ticketProduct(id));
+        if (products.some(p => !p)) fail(400, "A listing is unavailable");
+        return reply(res, {products});
+      }
       if (route === "/api/payment-instructions/applepay" && method === "GET") {
         const cfg = await config();
         if (!cfg.applePayConfigured)
@@ -575,10 +586,12 @@ export async function createApi({
                 item.quantity > 20
               )
                 fail(400, "Invalid item quantity");
-              const p = await db
+              const p = (await db
                 .prepare("SELECT * FROM products WHERE id=? AND active=1")
-                .get(text(item.productId, 100));
+                .get(text(item.productId, 100))) || festivalProduct(text(item.productId, 100)) || ticketProduct(text(item.productId, 100));
               if (!p) fail(400, "A product is no longer available");
+              if (p.kind === "ticket" && (item.quantity < p.lo || item.quantity > p.hi))
+                fail(400, "Choose an available ticket quantity");
               const size = text(item.size, 40);
               const key = p.id + ":" + size;
               if (seen.has(key)) fail(400, "Duplicate cart item");
@@ -613,6 +626,13 @@ export async function createApi({
               ? 999
               : 0;
 
+        let discount;
+        try {
+          discount = ticketDiscount(items, input.promoCode);
+        } catch (error) {
+          fail(400, error.message);
+        }
+        const total = subtotal + shipping - discount.amount;
         const address = Object.fromEntries(
           ["line1", "city", "state", "zip", "country"].map((key) => [
             key,
@@ -620,7 +640,7 @@ export async function createApi({
           ]),
         );
         if (
-          items.some((i) => i.kind === "merch") &&
+          items.some((i) => ["merch", "festival"].includes(i.kind)) &&
           ["line1", "city", "state", "zip", "country"].some(
             (key) => !address[key],
           )
@@ -637,11 +657,12 @@ export async function createApi({
         if (input.method === "usdt" && !cfg.usdtNetworks.some(n => n.network === input.network))
           fail(400, "Choose an available USDT receiving network");
         const details = receivingDetails(input.method, savedSettings, input.network);
+        if (discount.code) details.discount = discount;
         if (["btc", "usdt"].includes(input.method)) {
           try {
             Object.assign(
               details,
-              await marketQuote(input.method, subtotal + shipping, fetcher),
+              await marketQuote(input.method, total, fetcher),
             );
           } catch {
             details.quoteRequested = true;
@@ -655,7 +676,7 @@ export async function createApi({
             oid,
             client.id,
             input.method,
-            subtotal + shipping,
+            total,
             JSON.stringify(items),
             JSON.stringify(address),
             hash(token),

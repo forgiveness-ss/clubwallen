@@ -2628,7 +2628,8 @@ export default (e) => {
                                     type: "button",
                                     style: e_,
                                     onClick: () => {
-                                      (ek(null), et(3));
+                                      sessionStorage.setItem("cw_ticket_request", JSON.stringify({id: K.id, quantity: ei, name: `${eh} ${ex}`.trim(), email: em, promo: el ? p : ""}));
+                                      z.push("/checkout?type=ticket");
                                     },
                                     children: "Proceed to payment",
                                   }),
