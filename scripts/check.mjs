@@ -33,7 +33,7 @@ const bad=await api('/api/nowpayments/create-payment',{amount:-5});assert.equal(
 const payment=await api('/api/nowpayments/create-payment',{amount:350,orderId:'DEMO-1',orderDescription:'Membership'});
 assert.equal((await payment.json()).invoiceUrl,'/checkout/crypto');
 assert.equal(JSON.parse(sessionStorage.getItem('reserve_crypto_order')).amount,350);
-await api('/api/sand-orders',{orderId:'SIB-DEMO',items:[{unitPrice:100,qty:2}],promoCode:'MCM01'});
+await api('/api/sand-orders',{orderId:'SIB-DEMO',items:[{unitPrice:100,qty:2}],promoCode:'MOWA1'});
 const card=await api('/api/sand-orders/pay-card',{orderId:'SIB-DEMO'});assert.equal((await card.json()).url,'/checkout/crypto');
 assert.equal(JSON.parse(sessionStorage.getItem('reserve_crypto_order')).amount,100);
 assert.equal(JSON.parse(sessionStorage.getItem('reserve_crypto_order')).method,'card');

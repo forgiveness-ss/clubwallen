@@ -144,23 +144,26 @@ export default function PaymentSettings({ data, busy, onSave }) {
         </div>
         <div className="crm-settings-body">
           {toggle("usdtEnabled", "Offer USDT wallet transfers")}
-          <label>
-            Receiving network
-            <select
-              value={form.usdtNetwork || ""}
-              onChange={(e) =>
-                setForm({ ...form, usdtNetwork: e.target.value })
-              }
-            >
-              <option value="">Choose the network your wallet supports</option>
-              <option value="ethereum">Ethereum · ERC-20</option>
-              <option value="tron">Tron · TRC-20</option>
-            </select>
-          </label>
-          {field("usdtAddress", "USDT receiving address on this network", {
+          <p>
+            Ethereum (ETH) uses ERC-20. Tron uses TRC-20. Add both addresses to
+            offer both networks at checkout.
+          </p>
+          {field(
+            "usdtEthereumAddress",
+            "USDT · Ethereum (ERC-20) receiving address",
+            { spellCheck: false, autoComplete: "off" },
+          )}
+          {field("usdtTronAddress", "USDT · Tron (TRC-20) receiving address", {
             spellCheck: false,
             autoComplete: "off",
           })}
+          {form.usdtAddress && (
+            <p>
+              Previously configured {form.usdtNetwork} wallet remains available
+              until replaced by an address above.
+            </p>
+          )}
+
           <p>
             The selected network appears beside the address on every order. USDT
             transfers require your verification before activation.

@@ -633,7 +633,10 @@ export async function createApi({
             input.email.toLowerCase().trim(),
             text(input.name),
           );
-        const details = receivingDetails(input.method, await settings(db));
+        const savedSettings = await settings(db);
+        if (input.method === "usdt" && !cfg.usdtNetworks.some(n => n.network === input.network))
+          fail(400, "Choose an available USDT receiving network");
+        const details = receivingDetails(input.method, savedSettings, input.network);
         if (["btc", "usdt"].includes(input.method)) {
           try {
             Object.assign(

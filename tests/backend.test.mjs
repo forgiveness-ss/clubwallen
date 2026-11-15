@@ -646,7 +646,7 @@ test("BTC and USDT wallet transfers retain their network/address, wait for verif
     for (const method of ["btc", "usdt"]) {
       const created = await request(f.api, "/api/orders", {
         method: "POST",
-        data: { ...membership, method },
+        data: { ...membership, method, network: "ethereum" },
       });
       assert.equal(created.status, 201, JSON.stringify(created.json));
       const query = new URL(created.json.url, origin).search,
@@ -719,6 +719,22 @@ test("BTC and USDT wallet transfers retain their network/address, wait for verif
         .payment_details.network,
       "ethereum",
     );
+    const both = await request(f.api, "/api/admin/settings", {
+      method: "PATCH", cookie: owner,
+      data: {usdtEthereumAddress: "0x742d35cc6634c0532925a3b844bc454e4438f44e", usdtTronAddress: "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8"},
+    });
+    assert.equal(both.status, 200);
+    const networks = (await request(f.api, "/api/status")).json.usdtNetworks;
+    assert.deepEqual(networks.map(n => n.network), ["ethereum", "tron"]);
+    for (const network of ["", "bitcoin", "ethereum", "tron"]) {
+      const result = await request(f.api, "/api/orders", {method: "POST", data: {...membership, method: "usdt", network}});
+      assert.equal(result.status, ["ethereum", "tron"].includes(network) ? 201 : 400);
+      if (result.status === 201) {
+        const order = (await request(f.api, "/api/order" + new URL(result.json.url, origin).search)).json.order;
+        assert.equal(order.payment_details.network, network);
+        assert.equal(order.payment_details.address, network === "tron" ? "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8" : "0x742d35cc6634c0532925a3b844bc454e4438f44e");
+      }
+    }
     const duplicate = await request(f.api, "/api/orders", {
         method: "POST",
         data: { ...membership, method: "btc" },

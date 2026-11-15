@@ -10,7 +10,7 @@ export default (e) => {
     s = "#4caf7d",
     d = "#777",
     c = "#f0ece4",
-    p = "MW22",
+    p = "MOWA101",
     h = (e, t) => Array.from({ length: t - e + 1 }, (t, i) => String(e + i)),
     g = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").concat(["AA", "BB", "CC", "DD"]),
     x = [
@@ -1096,7 +1096,7 @@ export default (e) => {
           (W("event"), Z(!1), eR());
         },
         eN = K ? K.price * ei : 0,
-        eO = el ? 0.1 * eN : 0,
+        eO = el ? 0.3 * eN : 0,
         eH = eN - eO,
         eU = 0 * eH,
         eE = Math.round((eH + eU + (eH + eU) * 0) * 100) / 100,
@@ -2525,7 +2525,7 @@ export default (e) => {
                                             "Promo ",
                                             p,
                                             " (",
-                                            10,
+                                            30,
                                             "% off)",
                                           ],
                                         }),
@@ -2564,8 +2564,12 @@ export default (e) => {
                                 children: [
                                   (0, t.jsx)("input", {
                                     value: eo,
-                                    onChange: (e) =>
-                                      er(e.target.value.toUpperCase()),
+                                    onChange: (e) => {
+                                      er(e.target.value.toUpperCase());
+                                      ea(!1);
+                                      ed("");
+                                      ep("");
+                                    },
                                     placeholder: "PROMO CODE",
                                     maxLength: 8,
                                     style: {
@@ -2590,7 +2594,7 @@ export default (e) => {
                                         return;
                                       }
                                       (ed("ok"),
-                                        ep("✓ 10% discount applied!"),
+                                        ep("✓ 30% discount applied!"),
                                         ea(!0));
                                     },
                                     style: eQ,

@@ -50,7 +50,7 @@ export function installServices() {
       const stored=JSON.parse(sessionStorage.getItem('reserve_festival_order')||'null');
       if(!stored)return json({error:'Your checkout session has expired. Please return to your cart.'},400);
       const subtotal=stored.items.reduce((sum,item)=>sum+item.unitPrice*item.qty,0);
-      const amount=Math.round(subtotal*(stored.promoCode==='MCM01'?.5:1)*100)/100;
+      const amount=Math.round(subtotal*(stored.promoCode==='MOWA1'?.5:1)*100)/100;
       const method=url.pathname.endsWith('pay-card')?'card':'crypto';
       sessionStorage.setItem('reserve_crypto_order',JSON.stringify({id:stored.orderId,amount,orderDescription:'Sand In My Boots festival order',orderType:'festival',method,status:'demo_pending'}));
       return json({url:'/checkout/crypto',demo:true});

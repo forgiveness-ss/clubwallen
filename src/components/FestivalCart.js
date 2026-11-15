@@ -4,7 +4,7 @@ export default (e) => {
     a = e.i(13742),
     i = e.i(6028),
     o = e.i(55411);
-  let n = { MCM01: 0.5 },
+  let n = { MOWA1: 0.5 },
     s = new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",

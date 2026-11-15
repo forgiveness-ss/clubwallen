@@ -24,6 +24,8 @@ export const PAYMENT_DEFAULTS = {
   usdtEnabled: "false",
   usdtNetwork: "",
   usdtAddress: "",
+  usdtEthereumAddress: "",
+  usdtTronAddress: "",
   wireEnabled: "false",
   wireBeneficiary: "",
   wireBank: "",
@@ -72,6 +74,23 @@ export function wireReady(s) {
       /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(s.wireSwift))
   );
 }
+export function usdtNetworks(s) {
+  return [
+    {
+      network: "ethereum",
+      label: "Ethereum (ETH) · ERC-20",
+      address:
+        s.usdtEthereumAddress ||
+        (s.usdtNetwork === "ethereum" ? s.usdtAddress : ""),
+    },
+    {
+      network: "tron",
+      label: "Tron · TRC-20",
+      address:
+        s.usdtTronAddress || (s.usdtNetwork === "tron" ? s.usdtAddress : ""),
+    },
+  ].filter((n) => validWallet("usdt", n.address, n.network));
+}
 export function paymentReadiness(s) {
   return {
     applePayConfigured:
@@ -86,9 +105,10 @@ export function paymentReadiness(s) {
       s.applePayDescription || PAYMENT_DEFAULTS.applePayDescription,
     btcConfigured:
       isTrue(s.btcEnabled) && validWallet("btc", s.btcAddress, "bitcoin"),
-    usdtConfigured:
-      isTrue(s.usdtEnabled) &&
-      validWallet("usdt", s.usdtAddress, s.usdtNetwork),
+    usdtConfigured: isTrue(s.usdtEnabled) && usdtNetworks(s).length > 0,
+    usdtNetworks: isTrue(s.usdtEnabled)
+      ? usdtNetworks(s).map(({ network, label }) => ({ network, label }))
+      : [],
     wireConfigured: isTrue(s.wireEnabled) && wireReady(s),
     methods: ["applepay", "btc", "usdt", "wire"],
   };
@@ -120,13 +140,19 @@ export function validatePaymentSettings(s) {
     );
   if (s.btcAddress && !validWallet("btc", s.btcAddress, "bitcoin"))
     throw Error("Enter a valid Bitcoin mainnet receiving address");
+  for (const [key, network] of [
+    ["usdtEthereumAddress", "ethereum"],
+    ["usdtTronAddress", "tron"],
+  ])
+    if (s[key] && !validWallet("usdt", s[key], network))
+      throw Error(`Enter a valid USDT ${network} receiving address`);
   if (s.usdtAddress && !validWallet("usdt", s.usdtAddress, s.usdtNetwork))
     throw Error(
       "Choose Ethereum (ERC-20) or Tron (TRC-20) and enter a valid USDT receiving address",
     );
   if (isTrue(s.btcEnabled) && !s.btcAddress)
     throw Error("Add a BTC receiving address before enabling Bitcoin");
-  if (isTrue(s.usdtEnabled) && !s.usdtAddress)
+  if (isTrue(s.usdtEnabled) && !usdtNetworks(s).length)
     throw Error("Add a network and receiving address before enabling USDT");
   if (s.wireRouting && !validRouting(s.wireRouting))
     throw Error("Enter a valid nine-digit US wire routing number");
@@ -139,7 +165,7 @@ export function validatePaymentSettings(s) {
 }
 export const isManual = (method) =>
   ["applepay", "btc", "usdt", "wire", "cashapp"].includes(method);
-export function receivingDetails(method, s) {
+export function receivingDetails(method, s, network) {
   if (method === "applepay")
     return {
       type: "manual_instructions",
@@ -168,10 +194,16 @@ export function receivingDetails(method, s) {
       beneficiaryAddress: s.wireBeneficiaryAddress,
       instructions: s.wireInstructions,
     };
+  const wallet =
+    method === "usdt"
+      ? usdtNetworks(s).find((n) => n.network === network)
+      : null;
+  if (method === "usdt" && !wallet)
+    throw Error("Choose an available USDT receiving network");
   return {
     type: "crypto",
     asset: method.toUpperCase(),
-    network: method === "btc" ? "bitcoin" : s.usdtNetwork,
-    address: method === "btc" ? s.btcAddress : s.usdtAddress,
+    network: method === "btc" ? "bitcoin" : wallet.network,
+    address: method === "btc" ? s.btcAddress : wallet.address,
   };
 }

@@ -23,6 +23,7 @@ const available = (status, method) =>
     wire: status.wireConfigured,
   })[method];
 export function StoreCheckout() {
+  const [network, setNetwork] = React.useState("");
   const [preview, setPreview] = React.useState(null);
   const closePreview = React.useCallback(() => setPreview(null), []);
   async function showInstructions() {
@@ -80,6 +81,7 @@ export function StoreCheckout() {
       .then(([data, status]) => {
         setCatalog(data.products);
         setStatus(status);
+        setNetwork(status.usdtNetworks?.[0]?.network || "");
         setMethod(
           ["applepay", "btc", "usdt", "wire"].find((method) =>
             available(status, method),
@@ -122,7 +124,7 @@ export function StoreCheckout() {
     try {
       const data = await api("/api/orders", {
         method: "POST",
-        body: { ...form, method, items },
+        body: { ...form, method, items, network },
       });
       navigate(data.url);
     } catch (e) {
@@ -262,6 +264,26 @@ export function StoreCheckout() {
                   </div>
                 </label>
               ))}
+              {method === "usdt" && status.usdtConfigured && (
+                <label>
+                  USDT transfer network
+                  <select
+                    required
+                    value={network}
+                    onChange={(e) => setNetwork(e.target.value)}
+                  >
+                    {(status.usdtNetworks || []).map((n) => (
+                      <option key={n.network} value={n.network}>
+                        {n.label}
+                      </option>
+                    ))}
+                  </select>
+                  <small>
+                    Use the selected network only. Ethereum (ETH) and ERC-20
+                    refer to the same option.
+                  </small>
+                </label>
+              )}
               {membership && (
                 <div className="crm-alert">
                   One-year membership · manual yearly renewal.

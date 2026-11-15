@@ -34,48 +34,9 @@ export default (e) => {
       let b = async () => {
         if (!o.name || !o.email || !o.message)
           return void m("Please fill in your name, email, and message.");
-        (s(!0), m(null));
-        try {
-          if (u) {
-            let e = JSON.parse(
-              localStorage.getItem("cw_platform_messages") || "[]",
-            );
-            (e.push({
-              id: `msg_${Date.now()}`,
-              type: "support",
-              from: "me",
-              subject: o.subject || "Support Request",
-              body: o.message,
-              timestamp: new Date().toISOString(),
-              read: !0,
-              replies: [],
-              attachment: i?.name || null,
-            }),
-              localStorage.setItem("cw_platform_messages", JSON.stringify(e)));
-          }
-          (await fetch("/api/notify-admin", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              type: "support_message",
-              data: {
-                name: o.name,
-                email: o.email,
-                subject: o.subject,
-                message: o.message,
-                isMember: u,
-                attachment: i?.base64 || null,
-                attachmentName: i?.name || null,
-              },
-            }),
-          }),
-            c(!0));
-        } catch {
-          m(
-            "Something went wrong. Please try email us directly at support@clubwallen.site.",
-          );
-        }
-        s(!1);
+        m(null);
+        const body = `${o.message}\n\nFrom: ${o.name}\nEmail: ${o.email}${i ? "\n\nPlease attach your selected file in your email app before sending." : ""}`;
+        window.location.href = `mailto:Support@clubwallen.fans?subject=${encodeURIComponent(o.subject || "Support Request")}&body=${encodeURIComponent(body)}`;
       };
       return d
         ? (0, t.jsx)("div", {
@@ -170,7 +131,7 @@ export default (e) => {
                         margin: "0 auto",
                       },
                       children:
-                        "Have a question about your membership, an order, or anything else? Send us a message and we'll get back to you.",
+                        "Have a question? Send Message opens your email app with your message filled in. Send it from your own email account.",
                     }),
                   ],
                 }),
@@ -185,7 +146,7 @@ export default (e) => {
                     {
                       icon: "✉",
                       label: "Email",
-                      value: "support@clubwallen.site",
+                      value: "Support@clubwallen.fans",
                     },
                     {
                       icon: "⏱",
@@ -408,7 +369,8 @@ export default (e) => {
                             marginBottom: 8,
                             textTransform: "uppercase",
                           },
-                          children: "Attachment (Optional · Max 5MB)",
+                          children:
+                            "Attachment (add it in your email app before sending)",
                         }),
                         (0, t.jsxs)("div", {
                           style: {
@@ -502,9 +464,9 @@ export default (e) => {
                       children: [
                         "Or email directly: ",
                         (0, t.jsx)("a", {
-                          href: "mailto:support@clubwallen.site",
+                          href: "mailto:Support@clubwallen.fans",
                           style: { color: e },
-                          children: "support@clubwallen.site",
+                          children: "Support@clubwallen.fans",
                         }),
                       ],
                     }),
